@@ -1,0 +1,518 @@
+<script>
+    // Theme management
+    function getTheme() {
+        if (localStorage.getItem('tyro-dashboard-theme')) {
+            return localStorage.getItem('tyro-dashboard-theme');
+        }
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+
+    function setTheme(theme) {
+        localStorage.setItem('tyro-dashboard-theme', theme);
+        document.documentElement.classList.remove('light', 'dark');
+        document.documentElement.classList.add(theme);
+        updateThemeIcons(theme);
+    }
+
+    function toggleTheme() {
+        const currentTheme = getTheme();
+        setTheme(currentTheme === 'dark' ? 'light' : 'dark');
+    }
+
+    function updateThemeIcons(theme) {
+        const sunIcons = document.querySelectorAll('.sun-icon');
+        const moonIcons = document.querySelectorAll('.moon-icon');
+        
+        sunIcons.forEach(icon => {
+            icon.style.display = theme === 'dark' ? 'block' : 'none';
+        });
+        moonIcons.forEach(icon => {
+            icon.style.display = theme === 'dark' ? 'none' : 'block';
+        });
+    }
+
+    // Sidebar toggle (mobile)
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.querySelector('.sidebar-overlay');
+        sidebar.classList.toggle('active');
+        overlay.classList.toggle('active');
+    }
+
+    // Sidebar collapse/expand
+    function toggleSidebarCollapse() {
+        const sidebar = document.getElementById('sidebar');
+        const isCollapsed = sidebar.classList.toggle('collapsed');
+        localStorage.setItem('tyro-sidebar-collapsed', isCollapsed ? 'true' : 'false');
+    }
+
+    // Restore sidebar collapsed state on page load
+    function restoreSidebarState() {
+        const sidebar = document.getElementById('sidebar');
+        const isCollapsed = localStorage.getItem('tyro-sidebar-collapsed') === 'true';
+        if (isCollapsed && sidebar) {
+            sidebar.classList.add('collapsed');
+        }
+    }
+
+    // Apply sidebar state on load
+    restoreSidebarState();
+
+    (function initializeSidebarAccordion() {
+        const accordions = document.querySelectorAll('[data-sidebar-accordion]');
+
+        accordions.forEach((accordion, accordionIndex) => {
+            if (accordion.dataset.sidebarAccordionReady === 'true') {
+                return;
+            }
+
+            const compactMode = accordion.dataset.sidebarAccordionCompact === 'true';
+            const openSections = parseInt(accordion.dataset.sidebarAccordionOpenSections || '1', 10);
+            const sections = Array.from(accordion.querySelectorAll('.sidebar-section'));
+
+            sections.forEach((section, sectionIndex) => {
+                const children = Array.from(section.children);
+                const title = children.find((child) => child.classList && child.classList.contains('sidebar-section-title'));
+
+                if (!title) {
+                    return;
+                }
+
+                let content = children.find((child) => child.classList && child.classList.contains('sidebar-section-content'));
+
+                if (!content) {
+                    content = document.createElement('div');
+                    content.className = 'sidebar-section-content';
+
+                    let sibling = title.nextElementSibling;
+                    while (sibling) {
+                        const nextSibling = sibling.nextElementSibling;
+                        content.appendChild(sibling);
+                        sibling = nextSibling;
+                    }
+
+                    section.appendChild(content);
+                }
+
+                const contentId = `sidebar-section-content-${accordionIndex}-${sectionIndex}`;
+                const hasActiveLink = Boolean(content.querySelector('.sidebar-link.active'));
+                const shouldExpand = compactMode ? sectionIndex < openSections || hasActiveLink : true;
+
+                title.setAttribute('role', 'button');
+                title.setAttribute('tabindex', '0');
+                title.setAttribute('aria-controls', contentId);
+                content.id = contentId;
+
+                const setExpandedState = (expanded) => {
+                    title.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+                    content.hidden = !expanded;
+                };
+
+                setExpandedState(shouldExpand);
+
+                if (title.dataset.sidebarAccordionBound === 'true') {
+                    return;
+                }
+
+                const toggleSection = () => {
+                    setExpandedState(title.getAttribute('aria-expanded') !== 'true');
+                };
+
+                title.addEventListener('click', toggleSection);
+                title.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
+                        event.preventDefault();
+                        toggleSection();
+                    }
+                });
+
+                title.dataset.sidebarAccordionBound = 'true';
+            });
+
+            accordion.dataset.sidebarAccordionReady = 'true';
+        });
+    })();
+
+    // Add click handler to collapsed sidebar to expand it
+    document.addEventListener('DOMContentLoaded', function() {
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) {
+            sidebar.addEventListener('click', function(event) {
+                // Only expand if sidebar is collapsed and not clicking on collapse/expand buttons
+                if (this.classList.contains('collapsed') && 
+                    !event.target.closest('.sidebar-expand-btn') && 
+                    !event.target.closest('.sidebar-collapse-btn')) {
+                    toggleSidebarCollapse();
+                }
+            });
+        }
+    });
+
+    // User dropdown
+    function toggleUserDropdown() {
+        const dropdown = document.getElementById('userDropdown');
+        dropdown.classList.toggle('active');
+    }
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(event) {
+        const dropdown = document.getElementById('userDropdown');
+        if (dropdown && !dropdown.contains(event.target)) {
+            dropdown.classList.remove('active');
+        }
+    });
+
+    // Vertical Tab switching
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.vtabs-item[data-vtab]');
+        if (!btn) return;
+        e.preventDefault();
+
+        var tabId = btn.dataset.vtab;
+        var container = btn.closest('.vtabs-layout');
+        if (!container) return;
+
+        container.querySelectorAll('.vtabs-item').forEach(function(t) { t.classList.remove('active'); });
+        container.querySelectorAll('.vtabs-panel').forEach(function(p) { p.classList.remove('active'); });
+
+        btn.classList.add('active');
+        var panel = document.getElementById('vtab-' + tabId);
+        if (panel) panel.classList.add('active');
+
+        try { localStorage.setItem('vtab-' + location.pathname, tabId); } catch (e) {}
+    });
+
+    // Restore last active vtab on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        var saved;
+        try { saved = localStorage.getItem('vtab-' + location.pathname); } catch (e) {}
+        if (!saved) return;
+
+        var btn = document.querySelector('.vtabs-item[data-vtab="' + saved + '"]');
+        if (btn) btn.click();
+    });
+
+    // Apply theme on load
+    setTheme(getTheme());
+
+    // Listen for system theme changes
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        if (!localStorage.getItem('tyro-dashboard-theme')) {
+            setTheme(e.matches ? 'dark' : 'light');
+        }
+    });
+
+    // Toast Notification System
+    function showToast(message, type = 'success', options = {}) {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        
+        const icons = {
+            success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>',
+            error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>',
+            warning: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>',
+            info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>'
+        };
+
+        toast.innerHTML = `
+            <div class="toast-icon">${icons[type] || icons.success}</div>
+            <div class="toast-content">
+                <p class="toast-message">${message}</p>
+            </div>
+            <button class="toast-close" onclick="dismissToast(this.closest('.toast'))">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        `;
+
+        container.appendChild(toast);
+
+        const autoDismiss = parseInt(container.dataset.autoDismiss || 5000);
+        setTimeout(() => dismissToast(toast), autoDismiss);
+
+        return toast;
+    }
+
+    function dismissToast(toast) {
+        if (!toast || toast.classList.contains('toast-dismissing')) return;
+        
+        toast.classList.add('toast-dismissing');
+        toast.style.animationFillMode = 'forwards';
+        
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 300);
+    }
+
+    // Initialize toast notifications from flash messages
+    document.addEventListener('DOMContentLoaded', function() {
+        const toastContainer = document.getElementById('toast-container');
+        
+        if (toastContainer) {
+            const toasts = toastContainer.querySelectorAll('.toast');
+            const autoDismiss = parseInt(toastContainer.dataset.autoDismiss || 5000);
+            
+            toasts.forEach((toast, index) => {
+                setTimeout(() => {
+                    dismissToast(toast);
+                }, autoDismiss + (index * 100));
+            });
+        }
+
+        // Legacy alert auto-dismiss (for non-toast mode)
+        const notificationStyle = '{{ config('tyro-dashboard.notifications.notification_style', 'legacy') }}';
+        if (notificationStyle === 'legacy') {
+            const alerts = document.querySelectorAll('.alert');
+            const dismissTime = {{ config('tyro-dashboard.notifications.auto_dismiss_seconds', 5) * 1000 }};
+            
+            alerts.forEach(alert => {
+                setTimeout(() => {
+                    alert.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                    alert.style.opacity = '0';
+                    alert.style.transform = 'translateY(-10px)';
+                    setTimeout(() => alert.remove(), 300);
+                }, dismissTime);
+            });
+        }
+    });
+
+    // Confirm delete
+    function confirmDelete(message = 'Are you sure you want to delete this item?') {
+        return showConfirm('Confirm Delete', message);
+    }
+
+    // Global Modal System
+    let globalModalResolver = null;
+
+    function showModal(title, message, type = 'confirm', options = {}) {
+        return new Promise((resolve) => {
+            globalModalResolver = resolve;
+            
+            const modal = document.getElementById('globalModal');
+            const titleEl = document.getElementById('globalModalTitle');
+            const messageEl = document.getElementById('globalModalMessage');
+            const iconEl = document.getElementById('globalModalIcon');
+            const confirmBtn = document.getElementById('globalModalConfirm');
+            const cancelBtn = document.getElementById('globalModalCancel');
+            const promptInputContainer = document.getElementById('globalModalPromptInput');
+            const promptInput = document.getElementById('promptInput');
+
+            // Set title and message
+            titleEl.textContent = title;
+            messageEl.textContent = message;
+
+            // Set icon based on type
+            iconEl.className = 'modal-icon ' + (options.variant || type);
+            let iconSvg = '';
+            
+            switch(type) {
+                case 'confirm':
+                    iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>';
+                    break;
+                case 'alert':
+                case 'success':
+                    iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>';
+                    break;
+                case 'danger':
+                    iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>';
+                    break;
+                case 'info':
+                    iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>';
+                    break;
+                case 'prompt':
+                    iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>';
+                    break;
+            }
+            iconEl.innerHTML = iconSvg;
+
+            // Configure buttons based on type
+            if (type === 'alert' || type === 'success' || type === 'info') {
+                cancelBtn.style.display = 'none';
+                confirmBtn.textContent = options.confirmText || 'OK';
+                confirmBtn.className = 'btn btn-modal-confirm';
+            } else if (type === 'danger') {
+                cancelBtn.style.display = 'inline-flex';
+                confirmBtn.textContent = options.confirmText || 'Delete';
+                confirmBtn.className = 'btn btn-modal-danger';
+            } else {
+                cancelBtn.style.display = 'inline-flex';
+                confirmBtn.textContent = options.confirmText || 'Confirm';
+                confirmBtn.className = 'btn btn-modal-confirm';
+            }
+
+            // Handle prompt input
+            if (type === 'prompt') {
+                promptInputContainer.style.display = 'block';
+                promptInput.value = options.defaultValue || '';
+                promptInput.placeholder = options.placeholder || '';
+                setTimeout(() => promptInput.focus(), 100);
+            } else {
+                promptInputContainer.style.display = 'none';
+            }
+
+            // Show modal
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+
+            // Handle confirm button
+            confirmBtn.onclick = () => {
+                const resolver = globalModalResolver;
+                globalModalResolver = null;
+
+                if (type === 'prompt') {
+                    resolver(promptInput.value);
+                } else {
+                    resolver(true);
+                }
+                closeGlobalModal();
+            };
+
+            // Handle enter key for prompt
+            if (type === 'prompt') {
+                promptInput.onkeydown = (e) => {
+                    if (e.key === 'Enter') {
+                        resolve(promptInput.value);
+                        closeGlobalModal();
+                    } else if (e.key === 'Escape') {
+                        resolve(null);
+                        closeGlobalModal();
+                    }
+                };
+            }
+        });
+    }
+
+    function closeGlobalModal() {
+        const modal = document.getElementById('globalModal');
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+        
+        if (globalModalResolver) {
+            const resolver = globalModalResolver;
+            globalModalResolver = null;
+            resolver(false);
+        }
+    }
+
+    // Convenience functions
+    function showConfirm(title, message, options = {}) {
+        return showModal(title, message, 'confirm', options);
+    }
+
+    function showAlert(message, title = 'Success', options = {}) {
+        return showModal(title, message, 'alert', { variant: 'success', ...options });
+    }
+
+    function showSuccess(message, title = 'Success') {
+        return showModal(title, message, 'success', { variant: 'success' });
+    }
+
+    function showDanger(title, message, options = {}) {
+        return showModal(title, message, 'danger', { variant: 'danger', confirmText: 'Delete', ...options });
+    }
+
+    function showInfo(message, title = 'Information') {
+        return showModal(title, message, 'info', { variant: 'info' });
+    }
+
+    function showPrompt(title, message, defaultValue = '', placeholder = '') {
+        return showModal(title, message, 'prompt', { defaultValue, placeholder, variant: 'info' });
+    }
+
+    // Modal functions
+    function openModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    function closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+    }
+
+    // Close modal on overlay click
+    document.addEventListener('click', function(event) {
+        if (event.target.classList.contains('modal-overlay')) {
+            event.target.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+    });
+
+    // Close modal on escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            const activeModals = document.querySelectorAll('.modal-overlay.active');
+            if (activeModals.length) {
+                // Close the topmost modal first (last opened = last in DOM order),
+                // so stacked modals dismiss one at a time.
+                const topModal = activeModals[activeModals.length - 1];
+                topModal.classList.remove('active');
+                if (!document.querySelector('.modal-overlay.active')) {
+                    document.body.style.overflow = '';
+                }
+            }
+        }
+    });
+
+    // Initialize indeterminate checkboxes
+    document.querySelectorAll('input[type="checkbox"][data-indeterminate="true"]').forEach(function(checkbox) {
+        checkbox.indeterminate = true;
+    });
+</script>
+
+@if(config('tyro-dashboard.features.heartbeat', true))
+<script>
+    // Heartbeat: POST a beat every 5 minutes so online detection works
+    // regardless of the session driver. The last-beat timestamp is persisted
+    // in localStorage so a page refresh schedules only the remaining delay
+    // instead of restarting the interval.
+    (function() {
+        const heartbeatUrl = @json(route(\HasinHayder\TyroDashboard\Support\DashboardRoute::name('heartbeat')));
+        const storageKey = 'tyro-dashboard-heartbeat';
+        const interval = 300000; // 5 minutes
+
+        function fire() {
+            // Write before firing: a parallel tab loading right now reads this
+            // timestamp and schedules the remaining delay instead of doubling up.
+            try {
+                localStorage.setItem(storageKey, String(Date.now()));
+            } catch (e) {}
+
+            fetch(heartbeatUrl, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                },
+                keepalive: true,
+            }).catch(function() {});
+
+            setTimeout(fire, interval);
+        }
+
+        // Guarded like the setItem above: browsers with site storage blocked
+        // throw SecurityError on localStorage access — fall back to firing now.
+        let last = NaN;
+        try {
+            last = parseInt(localStorage.getItem(storageKey), 10);
+        } catch (e) {}
+        const elapsed = isNaN(last) ? interval : Date.now() - last;
+        const remaining = Math.min(Math.max(interval - elapsed, 0), interval);
+
+        setTimeout(fire, remaining);
+    })();
+</script>
+@endif

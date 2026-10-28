@@ -1,0 +1,338 @@
+@extends('tyro-dashboard::layouts.admin')
+
+@section('title', 'Users')
+
+@section('breadcrumb')
+<a href="{{ route($dashboardRoute::name('index')) }}">Dashboard</a>
+<span class="breadcrumb-separator">/</span>
+<span>Users</span>
+@endsection
+
+@section('content')
+<div class="page-header">
+    <div class="page-header-row">
+        <div>
+            <h1 class="page-title">Users</h1>
+            <p class="page-description">Manage user accounts, roles, and permissions.</p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <form action="{{ route($dashboardRoute::name('users.bulk-destroy')) }}" method="POST" id="bulk-delete-form" style="display: inline;">
+                @csrf
+                <button type="button" class="btn btn-destructive" id="bulk-delete-btn" style="display: none;" onclick="event.preventDefault(); submitBulkDelete();">Delete Selected</button>
+            </form>
+            <a href="{{ route($dashboardRoute::name('users.create')) }}" class="btn btn-primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Add User
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card" style="margin-bottom: 1rem;">
+    <div class="card-body">
+        <form action="{{ route($dashboardRoute::name('users.index')) }}" method="GET">
+            <div class="filters-bar">
+                <div class="search-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input type="text" name="search" class="form-input" placeholder="Search users..." value="{{ $filters['search'] ?? '' }}">
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Role:</label>
+                    <select name="role" class="form-select" style="min-width: 150px;" onchange="this.form.submit()">
+                        <option value="">All Roles</option>
+                        @foreach($roles as $role)
+                            <option value="{{ $role->slug }}" {{ ($filters['role'] ?? '') === $role->slug ? 'selected' : '' }}>{{ $role->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Status:</label>
+                    <select name="status" class="form-select" style="min-width: 130px;" onchange="this.form.submit()">
+                        <option value="">All Status</option>
+                        <option value="active" {{ ($filters['status'] ?? '') === 'active' ? 'selected' : '' }}>Active</option>
+                        <option value="suspended" {{ ($filters['status'] ?? '') === 'suspended' ? 'selected' : '' }}>Suspended</option>
+                        @if(config('session.driver') === 'database')
+                            <option value="logged_in" {{ ($filters['status'] ?? '') === 'logged_in' ? 'selected' : '' }}>Logged In</option>
+                        @endif
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-secondary">Filter</button>
+                @if(!empty($filters['search']) || !empty($filters['role']) || !empty($filters['status']))
+                    <a href="{{ route($dashboardRoute::name('users.index')) }}" class="btn btn-ghost">Clear</a>
+                @endif
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Users Table -->
+<div class="card">
+    @if($users->count())
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th style="width: 42px;">
+                            <input type="checkbox" id="select-all-users">
+                        </th>
+                        <th>User</th>
+                        <th>Roles</th>
+                        <th>Status</th>
+                        <th>Joined</th>
+                        <th style="text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($users as $listUser)
+                    <tr>
+                        <td>
+                            @if($listUser->id !== $user->id)
+                                <input type="checkbox" class="row-checkbox" name="selected_ids[]" value="{{ $listUser->id }}">
+                            @endif
+                        </td>
+                        <td>
+                            <a href="{{ route($dashboardRoute::name('users.edit'), $listUser->id) }}" class="user-cell" style="text-decoration: none;">
+                                <div class="user-cell-avatar" style="{{ ($listUser->profile_photo_path || $listUser->use_gravatar) ? 'background: none; padding: 0;' : '' }}">
+                                    @if($listUser->profile_photo_path || ($listUser->use_gravatar && $listUser->email))
+                                        <img src="{{ $listUser->profile_photo_url }}" alt="{{ $listUser->name }}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+                                    @else
+                                        {{ strtoupper(substr($listUser->name, 0, 1)) }}
+                                    @endif
+                                </div>
+                                <div class="user-cell-info">
+                                    <div class="user-cell-name" style="display: flex; align-items: center; gap: 0.5rem;">
+                                        {{ $listUser->name }}
+                                        @if($onlineUserIds->containsStrict((string) $listUser->getKey()))
+                                            <span title="Online" aria-label="Online" style="display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 9999px; background-color: var(--success); box-shadow: 0 0 0 3px color-mix(in srgb, var(--success), transparent 85%);"></span>
+                                        @endif
+                                    </div>
+                                    <div class="user-cell-email">{{ $listUser->email }}</div>
+                                </div>
+                            </a>
+                        </td>
+                        <td>
+                            <div class="badge-list">
+                                @forelse($listUser->roles as $role)
+                                    <span class="badge badge-primary">{{ $role->name }}</span>
+                                @empty
+                                    <span class="badge badge-secondary">No roles</span>
+                                @endforelse
+                            </div>
+                        </td>
+                        <td>
+                        @if(method_exists($listUser, 'isSuspended') && $listUser->isSuspended())
+                            <span class="badge badge-danger">Suspended</span>
+                        @else
+                            <span class="badge badge-success">Active</span>
+                        @endif
+                    </td>
+                    <td>{{ $listUser->created_at->format('M d, Y') }}</td>
+                    <td>
+                        <div class="action-buttons" style="justify-content: flex-end;">
+                            <a href="{{ route($dashboardRoute::name('users.edit'), $listUser->id) }}" class="action-btn" title="Edit">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </a>
+                            @if($listUser->id !== $user->id)
+                                <form action="{{ route($dashboardRoute::name('users.login-as'), $listUser->id) }}" method="POST" style="display: inline;" id="login-as-form-{{ $listUser->id }}">
+                                    @csrf
+                                    <button type="button" class="action-btn" title="Login As" onclick="event.preventDefault(); showConfirm('Login As User', 'Are you sure you want to log in as {{ addslashes($listUser->name) }}?').then(confirmed => { if(confirmed) document.getElementById('login-as-form-{{ $listUser->id }}').submit(); })">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                    </button>
+                                </form>
+                            @endif
+                            @if(method_exists($listUser, 'isSuspended') && $listUser->isSuspended())
+                                <form action="{{ route($dashboardRoute::name('users.unsuspend'), $listUser->id) }}" method="POST" style="display: inline;" id="unsuspend-form-{{ $listUser->id }}">
+                                    @csrf
+                                    <button type="button" class="action-btn" title="Unsuspend" onclick="event.preventDefault(); showConfirm('Unsuspend User', 'Are you sure you want to unsuspend this user?').then(confirmed => { if(confirmed) document.getElementById('unsuspend-form-{{ $listUser->id }}').submit(); })">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </button>
+                                </form>
+                            @elseif(method_exists($listUser, 'suspend'))
+                                <button type="button" class="action-btn action-btn-danger" title="Suspend" onclick="openSuspendModal({{ $listUser->id }}, '{{ addslashes($listUser->name) }}')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                    </svg>
+                                </button>
+                            @endif
+                            @if($listUser->id !== $user->id)
+                            @if(in_array(config('session.driver'), ['database', 'redis']))
+                                <form action="{{ route($dashboardRoute::name('users.logout'), $listUser->id) }}" method="POST" style="display: inline;" id="logout-user-form-{{ $listUser->id }}">
+                                    @csrf
+                                    <button type="button" class="action-btn action-btn-danger" title="Log Out" aria-label="Log out {{ $listUser->name }}" onclick="event.preventDefault(); showDanger('Log Out User', {{ Js::from('Are you sure you want to log out '.$listUser->name.'? This will force them out of all browser sessions and revoke all API tokens.') }}, { confirmText: 'Log Out' }).then(confirmed => { if(confirmed) document.getElementById('logout-user-form-{{ $listUser->id }}').submit(); })">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3-3H9m0 0l3-3m-3 3l3 3" />
+                                        </svg>
+                                    </button>
+                                </form>
+                            @endif
+                                <form action="{{ route($dashboardRoute::name('users.destroy'), $listUser->id) }}" method="POST" style="display: inline;" id="delete-user-form-{{ $listUser->id }}">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="button" class="action-btn action-btn-danger" title="Delete" onclick="event.preventDefault(); showDanger('Delete User', 'Are you sure you want to delete this user? This action cannot be undone.').then(confirmed => { if(confirmed) document.getElementById('delete-user-form-{{ $listUser->id }}').submit(); })">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </button>
+                                </form>
+                            @endif
+                        </div>
+                    </td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+        </div>
+
+    @if($users->hasPages())
+    <div class="pagination">
+        {{ $users->links() }}
+    </div>
+    @endif
+    @else
+    <div class="empty-state">
+        <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+        <h3 class="empty-state-title">No users found</h3>
+        <p class="empty-state-description">Get started by creating a new user.</p>
+        <a href="{{ route($dashboardRoute::name('users.create')) }}" class="btn btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Add User
+        </a>
+    </div>
+    @endif
+</div>
+
+<!-- Suspend Modal -->
+<div class="modal-overlay" id="suspendModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">Suspend User</h3>
+            <button type="button" class="modal-close" onclick="closeModal('suspendModal')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <form id="suspendForm" method="POST">
+            @csrf
+            <div class="modal-body">
+                <p style="margin-bottom: 1rem; color: var(--muted-foreground);">
+                    You are about to suspend <strong id="suspendUserName"></strong>. This will revoke all their active sessions.
+                </p>
+                <div class="form-group">
+                    <label for="reason" class="form-label">
+                        Reason for suspension <span class="form-label-optional">(optional)</span>
+                    </label>
+                    <textarea id="reason" name="reason" class="form-textarea" rows="3" placeholder="Enter a reason for suspension..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('suspendModal')">Cancel</button>
+                <button type="submit" class="btn btn-danger">Suspend User</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@push('scripts')
+<script>
+    function openSuspendModal(userId, userName) {
+        document.getElementById('suspendForm').action = '{{ url(config('tyro-dashboard.route_prefix', 'dashboard')) }}/users/' + userId + '/suspend';
+        document.getElementById('suspendUserName').textContent = userName;
+        document.getElementById('reason').value = '';
+        openModal('suspendModal');
+    }
+
+    function updateBulkDeleteButtonState() {
+        const checkedCount = document.querySelectorAll('.row-checkbox:checked').length;
+        const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
+        if (bulkDeleteBtn) {
+            bulkDeleteBtn.style.display = checkedCount > 0 ? '' : 'none';
+        }
+    }
+
+    function submitBulkDelete() {
+        const checked = document.querySelectorAll('.row-checkbox:checked');
+        if (checked.length === 0) {
+            return;
+        }
+
+        showDanger('Delete Selected Users', `Are you sure you want to delete ${checked.length} selected users? This action cannot be undone.`)
+            .then(confirmed => {
+                if (confirmed) {
+                    const form = document.getElementById('bulk-delete-form');
+                    form.querySelectorAll('input[name="selected_ids[]"]').forEach(el => el.remove());
+                    checked.forEach(cb => {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = 'selected_ids[]';
+                        input.value = cb.value;
+                        form.appendChild(input);
+                    });
+                    form.submit();
+                }
+            });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.querySelector('input[name="search"]');
+        if (searchInput && searchInput.value) {
+            searchInput.focus();
+            searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+        }
+
+        const selectAll = document.getElementById('select-all-users');
+        const rowCheckboxes = document.querySelectorAll('.row-checkbox');
+        let lastCheckedIndex = -1;
+
+        function syncSelectAll() {
+            const allChecked = rowCheckboxes.length > 0 && Array.from(rowCheckboxes).every((input) => input.checked);
+            if (selectAll) {
+                selectAll.checked = allChecked;
+            }
+            updateBulkDeleteButtonState();
+        }
+
+        if (selectAll) {
+            selectAll.addEventListener('change', function () {
+                rowCheckboxes.forEach((checkbox) => {
+                    checkbox.checked = selectAll.checked;
+                });
+                updateBulkDeleteButtonState();
+            });
+        }
+
+        rowCheckboxes.forEach((checkbox, index) => {
+            checkbox.addEventListener('click', function (e) {
+                if (e.shiftKey && lastCheckedIndex !== -1) {
+                    const start = Math.min(lastCheckedIndex, index);
+                    const end = Math.max(lastCheckedIndex, index);
+                    const isChecked = checkbox.checked;
+                    for (let i = start; i <= end; i++) {
+                        rowCheckboxes[i].checked = isChecked;
+                    }
+                }
+                lastCheckedIndex = index;
+                syncSelectAll();
+            });
+        });
+
+        updateBulkDeleteButtonState();
+    });
+</script>
+@endpush
+@endsection

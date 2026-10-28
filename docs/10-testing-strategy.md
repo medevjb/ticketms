@@ -1,0 +1,56 @@
+# Testing strategy
+
+## Test boundaries and execution
+
+Use installed Pest 5/Laravel 13 tools; check versions and sibling conventions before authoring. Existing tests are starter examples only. Preserve them. Feature tests configured in `phpunit.xml` use SQLite `:memory:`; that is useful for ordinary behavior but insufficient to prove MySQL locks, generated/check constraints, FULLTEXT, collation or concurrency.
+
+Future CI has two isolated lanes: fast unit/feature and dedicated disposable **MySQL 8.0-compatible** integration, aligned with current verified server 8.0.33. Never point RefreshDatabase at development `ticketms`. Require explicit dedicated test DB identity and environment checks before destructive test setup. Migration commands and all tests below are future work; none were executed for this documentation.
+
+Use factories for actors/tickets/versioned policies. Freeze/inject time, fixture calendars and holidays. Notification/Mail/Queue/Storage fakes isolate side effects, but also test rendered mail and actual isolated database notification insert. Fake only external boundaries; do not mock away ownership, state, transaction or SLA behavior. Real concurrency tests use separate processes/connections and barriers, not two sequential calls or a single test transaction.
+
+## Required behavioral scenarios
+
+| ID | Scenario and meaningful assertions |
+| --- | --- |
+| T01 | Ticket creation: valid ticket commits number/current policy/deadline/history/intents; invalid fields cause no domain writes; customer-supplied owner/status/deadline ignored/rejected; content update preserves protected fields. |
+| T02 | Number allocation: parallel creates/imports unique, annual Dhaka boundary, >999999 expands width, soft-deleted number never reused; rollback no duplicate/reuse promise. |
+| T03 | Ownership: customerA cannot list/search/view/update/download customerB; agent cannot access another assignee; queue only safe preview; forbidden audit/analytics counts absent; admin full legitimate scope. |
+| T04 | Spatie/Tyro compatibility: only Spatie grants authoritative; native incompatible role/user/API URLs disabled; Tyro menus/layouts/login/redirect/profile work; policy verb cannot be bypassed by similarly named permission; no dual trait conflicts. |
+| T05 | Role/account lifecycle: inactive/deleted user denied with existing session; revoked/disabled/deleted role loses permissions immediately across requests; restored role has no automatic memberships; guard mismatch denied; no direct grant/wildcard bypass. |
+| T06 | Internal-note isolation: HTML/JSON/mail/database alerts/search/activity/counts and file routes expose no internal content/IDs/filename to customers; staff own-ticket notes visible; note does not resume waiting. |
+| T07 | Assignment: least workload counts waiting/disabled live tickets; auto eligibility/tie/null timestamps; manual assignment vs auto flag; no candidate remains unassigned; no status/SLA reset; deactivated agent live work safely unassigned. |
+| T08 | Claim concurrency: two connections claim same ticket; exactly one succeeds, other409; one assignee/assignment activity; manual/auto/claim race also consistent; no duplicate delivery intent. |
+| T09 | State graph: every allowed/forbidden transition and actor, required resolution/wait/reopen reasons, explicit start, wait customer reply resumes, resolved explicit reopen, closed final and immutable, stale form409. |
+| T10 | Calendar arithmetic unit data: Thu5PM2h→Sun10AM; Friday→Sun11AM; holidaySunday→Mon10AM; exact opening/closing, entire closed week avoidance, multiple holidays, leap/year boundary, integer seconds and Dhaka UTC conversion; invalid/no-window calendar rejected. |
+| T11 | SLA lifecycle: wait freezes/resume consumes correctly; resolved period excluded; reopened remaining budget; priority change uses pinned target/original time; past breach preserved; calendar edits new-only; exact 80%/100% boundaries and ten-year guard. |
+| T12 | Escalation concurrency/retry: one stage per cycle under parallel scans; first late scan breach-only; paused/resolved skip; transition captures overdue breach before stop; reopened breached ticket new cycle; threshold_at vs detected_at correct. |
+| T13 | Files: MIME/extension spoof, oversize/count/path traversal, cross-ticket message FK, private response headers, parent inactive/deleted/message-internal denial; transaction/storage failure compensation; moderation/restoration access. |
+| T14 | Notifications: recipient matrix, actor dedup, disabled/revoked recipient skip, stable UUID prevents duplicate DB insert, mail failure doesn't block bar, no private payload; own read/read-all cannot modify others; hidden ticket notification excluded. |
+| T15 | Bulk: mixed valid/forbidden/stale IDs returns per-item outcomes, max 100, duplicate IDs/action abuse, replay same key, changed payload conflict, state/last-admin protection, each success audit; no hidden record label leak. |
+| T16 | CSV: valid/invalid/duplicate rows; existing-customer requirement; disabled option rejection; quoted multiline/BOM/UTF-8/header failures; case-sensitive external ID; archived duplicate preserved; counters and error CSV escaping. |
+| T17 | Import recovery: kill after row commit/before checkpoint; retry chunk no duplicate ticket/intent/counter; pause/cancel boundary; stale lease recovery; missing source failure; memory bounded for100 MiB/large fixture (performance lane). |
+| T18 | Record lifecycle: availability distinct from workflow; disabled live ticket SLA still runs; Closed-only archive; parent-child restore consistency, retained FK labels, identity reservation, protected current policy and system roles. |
+| T19 | Transactions/receipt/outbox: force failure midway leaves no partial ticket/activity/delivery; retryable deadlock does not repeat files/mail; same operation key returns committed result; crash after commit delivery recovered; permanent failures not blindly retried. |
+| T20 | Analytics: fixture totals/denominators/date boundaries, repeated resolution cycles, current snapshot vs date throughput, paused vs breached, disabled included operationally, archived only historical admin, cache actor/version isolation. |
+| T21 | Web security: login/reset/verification/2FA limits, CSRF, mass assignment, escaped XSS, SQL sort/filter injection, registration privilege escalation, secure errors/debug routes, last-admin concurrency. |
+| T22 | Authorization race: role/ownership changes before queued/bulk action revoke execution; file/notification access after reassignment; custom role membership queries respect active/deleted state and policy scope. |
+| T23 | Operations: queue retry/lease expiry, scheduler no overlap, failed intent retry, bounded scanning avoids starvation, pending import recovery, temp cleanup never deletes referenced files, backup restore rehearsal. |
+| T24 | Query/performance: list/detail query count bounded independently of page size; no N+1; representative EXPLAIN and measured p95 target; cursor repeatability; short-keyword search fallback limitations documented. |
+| T25 | Responsive UX/manual: role dashboards/table controls, mobile wrapping, keyboard/focus/error feedback, clear SLA pause/holiday/12-hour labels, bulk preview/outcome, analytical drilldowns match cards. |
+
+## Coverage design
+
+Service-pattern acceptance (D13/ADR06): feature tests exercise thin controllers through real services; integration tests exercise the same public service methods from import, bulk and job callers with explicit actor/system context. T01/T07–T12 cover service-owned domain rules, T03/T22 non-HTTP authorization, and T15/T17/T19 shared transaction/idempotency behavior. Pure calendar arithmetic uses unit tests. Avoid tests that merely assert service method invocation; assert observable results and failure atomicity. No additional test dependency is required for this pattern.
+
+- Unit: BusinessCalendar seconds/addition/threshold intersections; pure transition rules if extracted independently. Property-style checks: no closed-window consumption, monotonic consumption while running, exact inverse add/measure for reachable windows.
+- Feature: endpoint behavior, all role policy boundaries, validation, record lifecycle, transactional history/intents, notification bar and reports. Policy-only tests do not prove routes call them.
+- Integration: installed package adapters, Spatie cache lifecycle, MySQL schema checks/FKs/unique indexes, sequence/claim/last-admin races, delivery UUID insertion and checkpoint crash recovery.
+- Boundary/regression: T10–T12, stale forms and same-key/different-payload, malformed CSV, disabled/archived parent chains. Add bug reproductions before fixes.
+- Performance: separate repeatable staging workload, broad data distributions and retained history; no million-row seeding on development. Verify search and authorization filtering before benchmarking.
+- UI: manual checks initially; no browser test dependency installation without approval. Tyro “pixel consistency” means preserving component/theme conventions, not an invented visual reference. Document viewport/screenshots when actually reviewed.
+
+## Future execution and completion evidence
+
+Run narrow `php artisan test --compact path/to/test.php` after each meaningful change; MySQL group only after isolated test database verification. Run required Pint for PHP (`vendor/bin/pint --dirty --format agent`), Larastan and relevant frontend checks when touched. After focused tests pass, request owner run complete `php artisan test --compact` per project rules. No need to run builds for documentation-only changes.
+
+Each implementation PR/task records test command, environment, result/count, failures/skips and unverified behavior. Release gate: all critical T01–T23 pass, T24 measured and T25 reviewed, isolated migration upgrade verified, security/Spatie compatibility proven. Untested assumptions remain explicit; passing starter tests alone is not acceptance.

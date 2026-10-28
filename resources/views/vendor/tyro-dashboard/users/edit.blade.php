@@ -1,0 +1,329 @@
+@extends('tyro-dashboard::layouts.admin')
+
+@section('title', 'Edit User')
+
+@section('breadcrumb')
+<a href="{{ route($dashboardRoute::name('index')) }}">Dashboard</a>
+<span class="breadcrumb-separator">/</span>
+<a href="{{ route($dashboardRoute::name('users.index')) }}">Users</a>
+<span class="breadcrumb-separator">/</span>
+<span>Edit</span>
+@endsection
+
+@section('content')
+<div class="page-header">
+    <div class="page-header-row">
+        <div>
+            <h1 class="page-title">Edit User</h1>
+            <p class="page-description">Update user information and roles.</p>
+        </div>
+        <a href="{{ route($dashboardRoute::name('users.index')) }}" class="btn btn-secondary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Users
+        </a>
+    </div>
+</div>
+
+<div class="grid-2">
+    <!-- User Information -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">User Information</h3>
+        </div>
+        <form action="{{ route($dashboardRoute::name('users.update'), $editUser->id) }}" method="POST">
+            @csrf
+            @method('PUT')
+            <div class="card-body">
+                <div class="form-group">
+                    <label for="name" class="form-label">Name</label>
+                    <input type="text" id="name" name="name" class="form-input @error('name') is-invalid @enderror" value="{{ old('name', $editUser->name) }}" required>
+                    @error('name')
+                        <span class="form-error">{{ $message }}</span>
+                    @enderror
+                </div>
+
+                <div class="form-group">
+                    <label for="email" class="form-label">Email</label>
+                    <input type="email" id="email" name="email" class="form-input @error('email') is-invalid @enderror" value="{{ old('email', $editUser->email) }}" required>
+                    @error('email')
+                        <span class="form-error">{{ $message }}</span>
+                    @enderror
+                </div>
+
+                <div class="form-group">
+                    <label for="password" class="form-label">
+                        New Password <span class="form-label-optional">(leave blank to keep current)</span>
+                    </label>
+                    <input type="password" id="password" name="password" class="form-input @error('password') is-invalid @enderror" placeholder="••••••••">
+                    @error('password')
+                        <span class="form-error">{{ $message }}</span>
+                    @enderror
+                </div>
+
+                <div class="form-group">
+                    <label for="password_confirmation" class="form-label">Confirm New Password</label>
+                    <input type="password" id="password_confirmation" name="password_confirmation" class="form-input" placeholder="••••••••">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" style="margin-bottom: 0.75rem; display: block;">Assign Roles</label>
+                    <div class="role-grid">
+                        @foreach($roles as $role)
+                        <label class="role-card">
+                            <div class="role-card-header">
+                                <div class="role-title">{{ $role->name }}</div>
+                                <input type="checkbox" name="roles[]" value="{{ $role->id }}" class="role-checkbox" {{ in_array($role->id, old('roles', $editUser->roles->pluck('id')->toArray())) ? 'checked' : '' }}>
+                            </div>
+                            <div class="role-desc">{{ $role->slug }}</div>
+                        </label>
+                        @endforeach
+                    </div>
+                    @error('roles')
+                        <span class="form-error">{{ $message }}</span>
+                    @enderror
+                </div>
+            </div>
+            <div class="card-footer" style="display: flex; gap: 0.75rem;">
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+                <a href="{{ route($dashboardRoute::name('users.index')) }}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Account Status -->
+    <div>
+        <div class="card" style="margin-bottom: 1rem;">
+            <div class="card-header">
+                <h3 class="card-title">Account Status</h3>
+            </div>
+            <div class="card-body">
+                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                    <div class="user-cell-avatar" style="width: 64px; height: 64px; font-size: 1.5rem; {{ ((method_exists($editUser, 'hasProfilePhotoColumn') && $editUser->hasProfilePhotoColumn() && $editUser->profile_photo_path) || (method_exists($editUser, 'hasGravatarColumn') && $editUser->hasGravatarColumn() && $editUser->use_gravatar)) ? 'background: none; padding: 0;' : '' }}">
+                        @if((method_exists($editUser, 'hasProfilePhotoColumn') && $editUser->hasProfilePhotoColumn() && $editUser->profile_photo_path) || (method_exists($editUser, 'hasGravatarColumn') && $editUser->hasGravatarColumn() && $editUser->use_gravatar && $editUser->email))
+                            <img src="{{ $editUser->profile_photo_url }}" alt="{{ $editUser->name }}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+                        @else
+                            {{ strtoupper(substr($editUser->name, 0, 1)) }}
+                        @endif
+                    </div>
+                    <div>
+                        <div style="font-weight: 600; color: var(--foreground); display: flex; align-items: center; gap: 0.5rem;">
+                            {{ $editUser->name }}
+                            @if($isOnline)
+                                <span title="Online" aria-label="Online" style="display: inline-block; width: 0.625rem; height: 0.625rem; border-radius: 9999px; background-color: var(--success); box-shadow: 0 0 0 3px color-mix(in srgb, var(--success), transparent 85%);"></span>
+                            @endif
+                            @if(method_exists($editUser, 'isSuspended') && $editUser->isSuspended())
+                                <span class="badge badge-danger">Suspended</span>
+                            @else
+                                <span class="badge badge-success">Active</span>
+                            @endif
+                        </div>
+                        <div style="font-size: 0.875rem; color: var(--muted-foreground);">Member since {{ $editUser->created_at->format('M d, Y') }}</div>
+                        @if(method_exists($editUser, 'hasProfilePhotoColumn') && $editUser->hasProfilePhotoColumn() && $editUser->profile_photo_path)
+                        <div style="margin-top: 0.5rem;">
+                            <form id="delete-user-photo-form" action="{{ route($dashboardRoute::name('users.photo.delete'), $editUser->id) }}" method="POST" style="display: inline;">
+                                @csrf
+                                @method('DELETE')
+                                <button type="button" class="btn btn-sm btn-ghost" style="color: var(--danger); padding: 0.25rem 0.5rem;" onclick="showDanger('Remove Photo', 'Are you sure you want to remove this user\'s profile photo?').then(confirmed => { if(confirmed) document.getElementById('delete-user-photo-form').submit(); })">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; margin-right: 4px;">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    Remove Photo
+                                </button>
+                            </form>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+
+                @if(method_exists($editUser, 'isSuspended') && $editUser->isSuspended() && method_exists($editUser, 'getSuspensionReason') && $editUser->getSuspensionReason())
+                <div style="padding: 1rem; background-color: color-mix(in srgb, var(--destructive), transparent 90%); border-radius: 0.5rem; margin-top: 1rem;">
+                    <span style="font-size: 0.75rem; color: var(--destructive); font-weight: 600;">Suspension Reason:</span>
+                    <p style="font-size: 0.875rem; color: var(--foreground); margin-top: 0.25rem;">{{ $editUser->getSuspensionReason() }}</p>
+                </div>
+                @endif
+
+                <!-- 2FA Status & Reset -->
+                @if(config('tyro-login.two_factor.enabled'))
+                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <span style="font-size: 0.875rem; color: var(--muted-foreground);">Two-Factor Authentication</span>
+                        @if($editUser->two_factor_secret)
+                            <span class="badge badge-success">Enabled</span>
+                        @else
+                            <span class="badge badge-secondary">Disabled</span>
+                        @endif
+                    </div>
+                    @if($editUser->two_factor_secret)
+                        <form action="{{ route($dashboardRoute::name('users.2fa.reset'), $editUser->id) }}" method="POST" id="reset-2fa-form">
+                            @csrf
+                            @method('DELETE')
+                            <button type="button" class="btn btn-sm btn-outline-warning" style="width: 100%;" onclick="event.preventDefault(); showConfirm('Reset 2FA', 'Are you sure you want to reset 2FA for this user?').then(confirmed => { if(confirmed) document.getElementById('reset-2fa-form').submit(); })">
+                                Reset 2FA
+                            </button>
+                        </form>
+                    @endif
+                </div>
+                @endif
+
+                <!-- Account Actions -->
+                <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end;">
+                    @if(method_exists($editUser, 'isSuspended') && $editUser->isSuspended())
+                        <form action="{{ route($dashboardRoute::name('users.unsuspend'), $editUser->id) }}" method="POST">
+                            @csrf
+                            <button type="submit" class="btn btn-success">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Unsuspend User
+                            </button>
+                        </form>
+                    @elseif($editUser->id !== $user->id)
+                        <button type="button" class="btn btn-warning" onclick="openSuspendModal()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                            </svg>
+                            Suspend User
+                        </button>
+                    @endif
+                </div>
+            </div>
+        </div>
+
+        @if($editUser->id !== $user->id)
+        <div class="card" style="border-color: var(--destructive);">
+            <div class="card-header" style="background-color: color-mix(in srgb, var(--destructive), transparent 90%);">
+                <h3 class="card-title" style="color: var(--destructive);">Danger Zone</h3>
+            </div>
+            <div class="card-body">
+                <p style="font-size: 0.875rem; color: var(--muted-foreground); margin-bottom: 1rem;">
+                    Once you delete a user, there is no going back. Please be certain.
+                </p>
+                <div style="display: flex; justify-content: flex-end; gap: 0.75rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+                    @if(in_array(config('session.driver'), ['database', 'redis']))
+                    <form action="{{ route($dashboardRoute::name('users.logout'), $editUser->id) }}" method="POST" id="logout-user-form">
+                        @csrf
+                        <button type="button" class="btn btn-warning" onclick="event.preventDefault(); showDanger('Log Out User', {{ Js::from('Are you sure you want to log out '.$editUser->name.'? This will force them out of all browser sessions and revoke all API tokens.') }}, { confirmText: 'Log Out' }).then(confirmed => { if(confirmed) document.getElementById('logout-user-form').submit(); })">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3-3H9m0 0l3-3m-3 3l3 3" />
+                            </svg>
+                            Log Out User
+                        </button>
+                    </form>
+                    @endif
+                    <form action="{{ route($dashboardRoute::name('users.destroy'), $editUser->id) }}" method="POST" id="delete-user-form">
+                        @csrf
+                        @method('DELETE')
+                        <button type="button" class="btn btn-destructive" onclick="event.preventDefault(); showDanger('Delete User', 'Are you sure you want to delete this user? This action cannot be undone.').then(confirmed => { if(confirmed) document.getElementById('delete-user-form').submit(); })">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Delete User
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        @endif
+    </div>
+</div>
+
+<!-- Suspend Modal -->
+<div class="modal-overlay" id="suspendModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">Suspend User</h3>
+            <button type="button" class="modal-close" onclick="closeModal('suspendModal')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <form action="{{ route($dashboardRoute::name('users.suspend'), $editUser->id) }}" method="POST">
+            @csrf
+            <div class="modal-body">
+                <p style="margin-bottom: 1rem; color: var(--muted-foreground);">
+                    You are about to suspend <strong>{{ $editUser->name }}</strong>. This will revoke all their active sessions.
+                </p>
+                <div class="form-group">
+                    <label for="reason" class="form-label">
+                        Reason for suspension <span class="form-label-optional">(optional)</span>
+                    </label>
+                    <textarea id="reason" name="reason" class="form-textarea" rows="3" placeholder="Enter a reason for suspension..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('suspendModal')">Cancel</button>
+                <button type="submit" class="btn btn-danger">Suspend User</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@push('scripts')
+<form id="delete-user-photo-form" action="{{ route($dashboardRoute::name('users.photo.delete'), $editUser->id) }}" method="POST" style="display: none;">
+    @csrf
+    @method('DELETE')
+</form>
+<script>
+    function openSuspendModal() {
+        openModal('suspendModal');
+    }
+</script>
+@endpush
+
+@push('styles')
+<style>
+    .role-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 0.75rem;
+    }
+    .role-card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        padding: 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: 0.5rem;
+        background-color: var(--card);
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        user-select: none;
+    }
+    .role-card:hover {
+        border-color: var(--primary);
+        box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.05);
+    }
+    .role-card:has(.role-checkbox:checked) {
+        border-color: color-mix(in srgb, var(--primary), transparent 50%);
+        background-color: color-mix(in srgb, var(--primary), transparent 96%);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary), transparent 50%);
+    }
+    .role-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 0.25rem;
+    }
+    .role-title {
+        font-weight: 600;
+        font-size: 0.8125rem;
+        color: var(--foreground);
+    }
+    .role-checkbox {
+        width: 1rem;
+        height: 1rem;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+        accent-color: var(--primary);
+        cursor: pointer;
+    }
+    .role-desc {
+        font-size: 0.75rem;
+        color: var(--muted-foreground);
+    }
+</style>
+@endpush
+@endsection
