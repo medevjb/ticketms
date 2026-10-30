@@ -1,6 +1,6 @@
 # Rules for future AI coding agents
 
-These are project-specific implementation instructions to read alongside repository AGENTS.md and applicable skills. The documentation suite describes planned work, not an existing implementation. Current task authorization is documentation only; implementation requires a separate explicit owner instruction.
+These are project-specific implementation instructions to read alongside repository AGENTS.md and applicable skills. The database foundation is implemented; product workflows, authorization integration and user interfaces are still planned. Follow the scope of the owner's current implementation authorization and do not infer approval for unrelated feature work.
 
 ## Before changing anything
 
@@ -13,7 +13,7 @@ These are project-specific implementation instructions to read alongside reposit
 
 - Extend app code/config/published views; never edit vendor. Use conventional Laravel generators when creating implementation files; typed parameters/returns, constructor injection, casts and relationships, sibling naming/style.
 - Use the owner-approved service pattern in architecture ADR06: thin controllers call cohesive injected services under `app/Services/`; services own business rules, domain mutation and transaction boundaries. Form Requests validate HTTP and services reuse domain rules for import/jobs; policies authorize every resource operation, including service calls outside HTTP. No parallel `app/Actions/` layer, generic BaseService/repository hierarchy or mechanical service per model. Collaborating services participate in the outer operation transaction; do not create independent commits inside atomic workflows.
-- Spatie is the only permission store. Do not combine HasTyroRoles and HasRoles or map Spatie to Tyro role tables. Complete P01 compatibility proof first. Adapter methods read effective Spatie state; never override can() to bypass record policies.
+- Spatie is the only permission store. Persistence is installed as Spatie 8.3.2 using prefixed `access_*` tables. Do not combine HasTyroRoles and HasRoles or map Spatie to Tyro role tables. The current Tyro adapter is read-only; verify it with P01 auth/route tests and never override `can()` to bypass record policies.
 - Permission ability names differ from policy verbs. No unconditional admin Gate bypass. Role grants alone never remove ownership/assignment checks or last-admin/state guards. Active/deleted users/roles respected on every route/job/read.
 - Ticket lifecycle status, administrative is_active and deleted_at are separate. Follow module matrix. Soft delete is not privacy erasure; never delete audit/identity ledgers or cascade archive live ticket obligations.
 - Database constraints support validation; unique number/import/escalation/receipt keys and FKs are mandatory. Transaction includes state/message/SLA/history/delivery intent. Consistent lock order; no SMTP/network/file write in retried transaction.

@@ -10,7 +10,7 @@ import { defineConfig, lazyPlugins } from 'vite-plus';
 export default defineConfig({
     plugins: lazyPlugins(() => [
         laravel({
-            input: ['resources/css/app.css', 'resources/js/app.tsx'],
+            input: ['resources/css/app.css', 'resources/css/customer-portal.css', 'resources/js/app.tsx', 'resources/js/ticket-operations.ts'],
             refresh: true,
             fonts: [
                 bunny('Instrument Sans', {
@@ -26,6 +26,8 @@ export default defineConfig({
         tailwindcss(),
         wayfinder({
             formVariants: true,
+            routes: false,
+            skipDatabase: true,
         }),
     ]),
     server: {
@@ -64,6 +66,7 @@ export default defineConfig({
         singleAttributePerLine: false,
         htmlWhitespaceSensitivity: 'css',
         ignorePatterns: [
+            'docs/**',
             '.github/**',
             'composer.json',
             'resources/js/components/ui/*',

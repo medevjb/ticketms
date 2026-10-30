@@ -1,8 +1,18 @@
 # Background processing
 
+## Implemented scope (P06)
+
+The application now has `DeliverTicketNotification` and `EvaluateTicketSla` jobs, `NotificationDeliveryService` and `TicketEscalationService`, `ticketing:dispatch-notifications` and `ticketing:scan-sla` commands, and minute schedules for both commands. Ticket activity is dispatched after commit; notification intents are written with the activity transaction and recovered by the periodic dispatcher. No schema change was needed: the existing `notification_deliveries`, `notifications`, and unique escalation cycle/stage schema are used.
+
+Database and mail are delivered as separate jobs to `notifications-database` and `notifications-mail`. The delivery service atomically claims a row with an 85-second lease, rechecks recipient account/permission/current ticket scope, and persists retry count and backoff. Its durable retry policy is five attempts with configured delays of 10/60/300/900 seconds; terminal failures retain a safe exception class code. The queue job itself has a 60-second timeout and three framework attempts for uncaught worker failures. Database notifications reuse the intent UUID and detect an already-inserted row. Mail transport cannot guarantee exactly-once delivery if the provider accepts a message and the worker dies before recording success.
+
+The SLA command selects bounded due candidates using persisted warning/due projections and a rotating cache cursor. Unique per-ticket jobs recompute under a ticket row lock; `ticket_escalations` enforces one stage per ticket/resolution-cycle/stage. A late first scan records only the currently reached highest stage. Breach activity/intents are committed with the escalation; notifications go to the assigned agent and active administrators, never the customer. Wait/resolution/closed states are excluded by the evaluator, and state-changing services record an already-due stage before changing the SLA state.
+
+The notification center routes through `notifications.view`, scopes each row against current ticket access, paginates, and limits read/read-all operations to the actor. The Tyro topbar count is loaded with scoped unread-count logic. Queue supervision, actual SMTP, shared production cache locks, service monitoring/alerts, and MySQL concurrency tests remain deployment/hardening work, not verified by the focused SQLite suite.
+
 ## Execution model
 
-Use Laravel database queues initially; supervised independent workers for `sla`, `notifications-database`, `notifications-mail`, `imports`, and `maintenance`. This separates priority without introducing new infrastructure. Do not start workers, install Horizon or run schedules as part of documentation. Redis/Horizon is a measured future option, not required.
+Use Laravel database queues initially. The implemented queues are `sla`, `notifications-database`, `notifications-mail`, and `imports`. Ticket import chunks use resumable row/byte checkpoints and `ticketing:recover-imports` scans for stalled runs every five minutes. Supervise independent workers to separate priority without introducing new infrastructure. Redis/Horizon is a measured future option, not required.
 
 Business services synchronously commit core invariants, activity and notification-delivery intent. Events represent committed facts; listeners perform secondary work, not required ownership/audit writes. Transactional intent plus periodic recovery prevents lost notifications after a commit-to-dispatch crash.
 
@@ -26,11 +36,11 @@ InternalNoteAdded is staff-only history; no customer notification. Prefer framew
 
 | Job/command | Bounds and idempotency | Failure and recovery |
 | --- | --- | --- |
-| DispatchPendingDeliveries | Query pending/expired leases in chunks 100; claim row atomically, enqueue delivery ID | Dispatcher reruns; lease 5 min; worker timeout60s, reservation90s; expired lease recovered |
-| DeliverTicketNotification | Reload recipient active/effective scope; one delivery channel row; stable UUID for database channel | Tries5, backoff10/60/300/900s; permanent forbidden/deleted recipient => skipped; exhausted=>failed and ops alert |
-| CheckTicketSla | Candidate IDs chunk 200 by indexed due/warning and running state; lock/recompute; unique cycle-stage | Tries3, backoff5/30s; state changes skip; scan rediscovers pending crossing |
+| `ticketing:dispatch-notifications` | Query up to configured batch (default 100) of due pending or expired-lease rows; enqueue delivery ID | Dispatcher reruns; delivery service lease 85s; expired processing rows become candidates again |
+| `DeliverTicketNotification` | One durable channel row; reload recipient active/effective scope; stable UUID for database channel | Durable tries 5, backoff 10/60/300/900s; no longer authorized/deleted recipient => skipped; exhausted => failed |
+| `ticketing:scan-sla` / `EvaluateTicketSla` | Candidate IDs up to configured batch (default 200), rotating cursor; lock/recompute; unique cycle-stage | Job retries 3 times for uncaught failures; state changes skip; periodic scan rediscovers candidates |
 | AssignUnassignedTickets | Finite chunk 100; coordinator + ticket/agent locks; only unassigned live active tickets | Tries3; no eligible agent is valid no-op; scheduled recovery and eligibility changes retry later |
-| ProcessTicketImportChunk | At most100 complete CSV records/job and max45s; row/external-ID uniqueness; persist valid checkpoint | Tries3, backoff10/60s; file/schema permanent error=>failed; partial row validation=>continue; terminal failed run manually resumable from checkpoint |
+| ProcessTicketImportChunk | At most100 complete CSV records/job; job timeout110s; row/external-ID uniqueness; persist valid checkpoint | Tries3, backoff10/60s; file/schema permanent error=>failed; partial row validation=>continue; terminal failed run manually resumable from checkpoint |
 | ExecuteBulkOperation | Initial ≤100 items may run synchronously; if future queued, same item ledger/action | Retry pending only; current actor permission rechecked; revoked actor stops remaining items |
 | CleanupTemporaryArtifacts | Daily bounded objects with ledger/age; never delete referenced retained attachments/audit | Tries3; storage errors logged/retried; no broad storage glob purge |
 
@@ -62,7 +72,8 @@ Persist each `(activity,recipient,channel)` intent atomically with activity. For
 | --- | --- | --- |
 | Every minute | Scan approaching/breach candidates and dispatch bounded SLA jobs | withoutOverlapping, onOneServer with shared lock store; unique per-ticket stage guard remains authoritative |
 | Every minute | Dispatch pending notification intents, recover expired leases | Bounded batches; no SMTP in scheduler process |
-| Every minute | Assign finite unassigned batch and recover stalled imports | Independent named tasks; safe idempotency/lease checks |
+| Every five minutes | Recover stalled imports | Re-dispatch the current checkpoint; run and row uniqueness prevent duplicate ticket creation |
+| Planned | Assign finite unassigned batch | Independent named task; safe idempotency/lease checks |
 | Daily | Cleanup abandoned staged files (>24h), temporary import input/error artifacts (>30d after terminal run) | Referenced permanent files excluded; approved limits via config; no ticket/audit deletion |
 | Daily | Operational summary/backup verification alert | Do not run actual database backup through app user unless operational design explicitly approves |
 
@@ -76,4 +87,4 @@ Every job carries entity/operation/correlation identifiers, not full Eloquent gr
 
 Set timeout below retry_after with sufficient margin. Proposed ordinary job 60s/reservation90s; import 45s fits same reservation. Scale/adjust with measured data and ensure lease exceeds worker timeout. Monitor queue oldest age by queue, failed jobs, delivery statuses/leases, import heartbeat, SLA detection lag and scheduler heartbeat. Alert admin/operator on failed SLA scans or oldest SLA queue age>60s. Manual retry preserves operation keys and never bypasses policy.
 
-Release evidence: concurrent stage checks produce one escalation/database alert; rollback emits no intents; crash after commit is recovered; disabled recipients skipped; repeated import chunk produces no duplicate tickets; notification bar remains scoped. These tests have not been run during documentation.
+P06 focused evidence: SQLite feature tests pass for stable database UUID/repeat delivery, per-channel queue routing, current-scope inbox/read behavior, approaching/breached deduplication, and late first scan breach-only behavior. Adjacent conversation/workflow/assignment tests also pass. No actual SMTP, simultaneous MySQL escalation workers, queue daemon recovery, deployment scheduler lock, or crash-process test was run. Rollback/no-intent and full failed-mail/recovery acceptance remain planned.

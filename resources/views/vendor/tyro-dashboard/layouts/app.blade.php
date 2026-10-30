@@ -25,7 +25,7 @@
     @include('tyro-dashboard::partials.admin-bar')
     <div class="dashboard-layout">
         <!-- Sidebar - Conditional based on role (driven by config('tyro-dashboard.admin_roles')) -->
-        @hasanyrole(...config('tyro-dashboard.admin_roles', ['admin', 'super-admin']))
+        @hasanyrole(...config('tyro-dashboard.admin_roles', ['admin']))
             @include('tyro-dashboard::partials.admin-sidebar')
         @else
             @include('tyro-dashboard::partials.user-sidebar')

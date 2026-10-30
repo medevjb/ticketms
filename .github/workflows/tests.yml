@@ -31,8 +31,23 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Setup Application
-        run: composer setup
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Prepare test environment
+        run: cp .env.example .env && php artisan key:generate --force
+
+      - name: Audit Composer dependencies
+        run: composer audit --locked
+
+      - name: Audit JavaScript dependencies
+        run: npm audit
+
+      - name: Build frontend assets
+        run: npm run build
 
       - name: Run CI Checks
         run: composer ci:check

@@ -1294,7 +1294,7 @@ if (!function_exists('formatBytes')) {
 </div>
 
 @php
-$adminRoles = config('tyro-dashboard.admin_roles', ['admin', 'super-admin']);
+$adminRoles = config('tyro-dashboard.admin_roles', ['admin']);
 $canDeleteMedia = !session()->has('impersonator_id') && !empty(array_intersect(array_merge($adminRoles, ['editor']), auth()->user()?->tyroRoleSlugs() ?? []));
 $authUserId = auth()->id();
 @endphp

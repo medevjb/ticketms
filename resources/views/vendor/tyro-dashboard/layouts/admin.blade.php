@@ -24,8 +24,11 @@
 <body>
     @include('tyro-dashboard::partials.admin-bar')
     <div class="dashboard-layout">
-        <!-- Admin Sidebar -->
-        @include('tyro-dashboard::partials.admin-sidebar')
+        @if($isAdmin ?? false)
+            @include('tyro-dashboard::partials.admin-sidebar')
+        @else
+            @include('tyro-dashboard::partials.user-sidebar')
+        @endif
 
         <!-- Main Content -->
         <div class="main-content">

@@ -24,7 +24,7 @@ return [
     | (user management, role management, privilege management, settings).
     |
     */
-    'admin_roles' => ['admin', 'super-admin'],
+    'admin_roles' => ['admin'],
 
     /*
     |--------------------------------------------------------------------------
@@ -114,9 +114,9 @@ return [
     |
     */
     'features' => [
-        'user_management' => true,
-        'role_management' => true,
-        'privilege_management' => true,
+        'user_management' => false,
+        'role_management' => false,
+        'privilege_management' => false,
         'settings_management' => true,
         'profile_management' => true,
         'invitation_system' => env('TYRO_DASHBOARD_ENABLE_INVITATION', true),
@@ -127,8 +127,8 @@ return [
         'checkpoints' => env('TYRO_DASHBOARD_ENABLE_CHECKPOINTS', true),
         'health' => env('TYRO_DASHBOARD_ENABLE_HEALTH', true),
         'log_viewer' => env('TYRO_DASHBOARD_ENABLE_LOG_VIEWER', true),
-        'show_roles_menu' => env('TYRO_DASHBOARD_SHOW_ROLES_MENU', true),
-        'show_privileges_menu' => env('TYRO_DASHBOARD_SHOW_PRIVILEGES_MENU', true),
+        'show_roles_menu' => false,
+        'show_privileges_menu' => false,
         'show_resources_menu' => env('TYRO_DASHBOARD_SHOW_RESOURCES_MENU', true),
         'activity_log' => false, // Future feature
         'profile_photo_upload' => env('TYRO_DASHBOARD_ENABLE_PROFILE_PHOTO', false),
@@ -157,7 +157,7 @@ return [
     |
     */
     'protected' => [
-        'roles' => ['admin', 'super-admin', 'user'],
+        'roles' => ['admin', 'user'],
         'users' => [], // Add user IDs that cannot be deleted
     ],
 
@@ -186,7 +186,7 @@ return [
     'notifications' => [
         'show_flash_messages' => true,
         'auto_dismiss_seconds' => 5,
-        'notification_style' => env('TYRO_DASHBOARD_NOTIFICATION_STYLE', 'legacy'), // 'legacy' or 'toast'
+        'notification_style' => env('TYRO_DASHBOARD_NOTIFICATION_STYLE', 'toast'), // 'legacy' or 'toast'
         'toast_position' => env('TYRO_DASHBOARD_TOAST_POSITION', 'bottom-right'), // 'top-right' or 'bottom-right'
     ],
 

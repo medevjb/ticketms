@@ -409,8 +409,10 @@
 
     .topbar-left {
         display: flex;
+        flex: 1 1 auto;
         align-items: center;
         gap: 0.75rem;
+        min-width: 0;
     }
 
     .mobile-menu-btn {
@@ -438,6 +440,16 @@
         gap: 0.5rem;
         font-size: 0.9375rem;
         color: var(--muted-foreground);
+        min-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+    }
+
+    .breadcrumb > * {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .breadcrumb a {
@@ -457,18 +469,27 @@
 
     .topbar-right {
         display: flex;
+        flex: 0 0 auto;
         align-items: center;
         gap: 0.5rem;
     }
 
     .topbar-btn {
-        padding: 0.5rem;
+        position: relative;
+        display: inline-flex;
+        flex: 0 0 auto;
+        align-items: center;
+        justify-content: center;
+        width: 2.5rem;
+        height: 2.5rem;
+        padding: 0;
         border: none;
         background: transparent;
         color: var(--muted-foreground);
         cursor: pointer;
         border-radius: 6px;
         transition: all 0.15s ease;
+        text-decoration: none;
     }
 
     .topbar-btn:hover {
@@ -477,8 +498,31 @@
     }
 
     .topbar-btn svg {
+        display: block;
+        flex: 0 0 auto;
         width: 18px;
         height: 18px;
+    }
+
+    .ticket-notification-count {
+        position: absolute;
+        top: 0.125rem;
+        right: 0.125rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 1.125rem;
+        height: 1.125rem;
+        padding: 0 0.25rem;
+        border: 2px solid var(--background);
+        border-radius: 999px;
+        background: var(--destructive);
+        color: var(--destructive-foreground);
+        font-size: 0.625rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+        pointer-events: none;
     }
 
     /* User Dropdown */
@@ -2392,6 +2436,26 @@
 
         .page-content {
             padding: 1rem;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .topbar {
+            gap: 0.5rem;
+            padding-inline: 0.75rem;
+        }
+
+        .topbar-left {
+            gap: 0.375rem;
+        }
+
+        .breadcrumb {
+            gap: 0.25rem;
+            font-size: 0.8125rem;
+        }
+
+        .topbar-right {
+            gap: 0.25rem;
         }
     }
 

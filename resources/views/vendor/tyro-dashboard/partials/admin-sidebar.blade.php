@@ -53,6 +53,20 @@
                 </svg>
                 My Profile
             </a>
+            @if(auth()->user() && auth()->user()->can('tickets.view'))
+            <a href="{{ route('dashboard.tickets.index') }}" class="sidebar-link {{ request()->routeIs('dashboard.tickets.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 5h16v14H4zM8 9h8M8 13h5" />
+                </svg>
+                Tickets
+            </a>
+            @endif
+            @if(auth()->user() && auth()->user()->can('analytics.view'))
+            <a href="{{ route('dashboard.analytics.index') }}" class="sidebar-link {{ request()->routeIs('dashboard.analytics.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 19V5m0 14h16M8 15v-4m4 4V8m4 7v-6" /></svg>
+                Analytics
+            </a>
+            @endif
             @if(!empty($commonMenuItems))
                 @foreach($commonMenuItems as $item)
                     <a href="{{ route($item['route'] ?? '#') }}" class="sidebar-link {{ request()->routeIs($item['route'] ?? '') ? 'active' : '' }}">
@@ -87,12 +101,66 @@
         <!-- Admin Menu -->
         <div class="sidebar-section">
             <div class="sidebar-section-title">Administration</div>
+            @if(auth()->user() && in_array('admin', auth()->user()->tyroRoleSlugs(), true) && auth()->user()->can('categories.manage'))
+            <a href="{{ route('dashboard.categories.index') }}" class="sidebar-link {{ request()->routeIs('dashboard.categories.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 5h16M4 12h16M4 19h16" />
+                </svg>
+                Categories
+            </a>
+            @endif
+            @if(auth()->user() && in_array('admin', auth()->user()->tyroRoleSlugs(), true) && auth()->user()->can('priorities.manage'))
+            <a href="{{ route('dashboard.priorities.index') }}" class="sidebar-link {{ request()->routeIs('dashboard.priorities.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h10M4 18h6" />
+                </svg>
+                Priorities
+            </a>
+            @endif
+            @if(auth()->user() && in_array('admin', auth()->user()->tyroRoleSlugs(), true) && auth()->user()->can('calendars.manage'))
+            <a href="{{ route('dashboard.calendars.index') }}" class="sidebar-link {{ request()->routeIs('dashboard.calendars.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 012 2v14H3V6a2 2 0 012-2z" />
+                </svg>
+                Business calendar
+            </a>
+            @endif
+            @if(auth()->user() && in_array('admin', auth()->user()->tyroRoleSlugs(), true) && auth()->user()->can('sla.manage'))
+            <a href="{{ route('dashboard.sla-policies.index') }}" class="sidebar-link {{ request()->routeIs('dashboard.sla-policies.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v18m9-9H3M6 6l12 12m0-12L6 18" />
+                </svg>
+                SLA policies
+            </a>
+            @endif
+            @if(auth()->user() && in_array('admin', auth()->user()->tyroRoleSlugs(), true) && auth()->user()->can('imports.manage'))
+            <a href="{{ route('dashboard.ticket-imports.index') }}" class="sidebar-link {{ request()->routeIs('dashboard.ticket-imports.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0L7 9m5-5l5 5M4 16v4h16v-4" />
+                </svg>
+                Ticket imports
+            </a>
+            @endif
+            @if(auth()->user() && in_array('admin', auth()->user()->tyroRoleSlugs(), true) && auth()->user()->can('users.manage'))
+            <a href="{{ route('dashboard.access.users') }}" class="sidebar-link {{ request()->routeIs('dashboard.access.users*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2m14-13a4 4 0 11-8 0 4 4 0 018 0zm4 5.5a4 4 0 013 3.87V21" /></svg>
+                User access
+            </a>
+            @endif
+            @if(auth()->user() && in_array('admin', auth()->user()->tyroRoleSlugs(), true) && auth()->user()->can('roles.manage'))
+            <a href="{{ route('dashboard.access.roles') }}" class="sidebar-link {{ request()->routeIs('dashboard.access.roles*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l8 4v5c0 5-3.5 8-8 10-4.5-2-8-5-8-10V7l8-4zm-3 9l2 2 4-4" /></svg>
+                Role access
+            </a>
+            @endif
+            @if(config('tyro-dashboard.features.user_management', true))
             <a href="{{ route($dashboardRoute::name('users.index')) }}" class="sidebar-link {{ request()->routeIs($dashboardRoute::pattern('users.*')) ? 'active' : '' }}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
                 Users
             </a>
+            @endif
             @if(config('tyro-dashboard.features.show_roles_menu', true))
             <a href="{{ route($dashboardRoute::name('roles.index')) }}" class="sidebar-link {{ request()->routeIs($dashboardRoute::pattern('roles.*')) ? 'active' : '' }}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

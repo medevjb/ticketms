@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\MySqlDatabaseTestCase;
 use Tests\TestCase;
 
 /*
@@ -48,3 +49,7 @@ function something()
 {
     // ..
 }
+
+pest()->extend(MySqlDatabaseTestCase::class)
+    ->group('mysql')
+    ->in('Integration');

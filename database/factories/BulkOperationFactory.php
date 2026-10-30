@@ -3,22 +3,23 @@
 namespace Database\Factories;
 
 use App\Models\BulkOperation;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
-/**
- * @extends Factory<BulkOperation>
- */
+/** @extends Factory<BulkOperation> */
 class BulkOperationFactory extends Factory
 {
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function definition(): array
     {
         return [
-            //
+            'operation_key' => (string) Str::uuid(),
+            'actor_id' => User::factory(),
+            'module' => 'tickets',
+            'action' => 'resolve',
+            'submitted_count' => 1,
+            'started_at' => now(),
         ];
     }
 }

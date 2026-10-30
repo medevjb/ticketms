@@ -1,10 +1,10 @@
 # Support Ticket & SLA Management — documentation
 
-Version: 1.0 · Prepared: 2026-10-29 · Status: proposed implementation baseline, awaiting final owner approval.
+Version: 1.4 · Prepared: 2026-10-30 · Status: P01–P09 application work is implemented and locally verified; owner local acceptance remains, Docker is deferred, and production deployment is outside this handoff.
 
 ## Purpose and usage
 
-Build a single-organization support system in the existing Laravel 13 application and Tyro dashboard. These documents specify future behavior; they do not claim that features exist. No implementation, dependency installation, migrations, or runtime acceptance tests were performed while preparing this suite.
+Build a single-organization support system in the existing Laravel 13 application and Tyro dashboard. P01–P09 application scope is implemented. The live `ticketms` MySQL 8.0.33 database records 30 migrations and has baseline configuration, one account for each role, and three local demo tickets. Fresh local databases start without users; create the initial admin with `php artisan ticketing:make-admin`. The current ignored `.env` disables 2FA for this local test session.
 
 Business logic uses the owner-approved **service pattern**: thin controllers call cohesive domain services shared by jobs, imports and bulk operations. See PRD D13 and architecture ADR06 for the mandatory boundaries and transaction responsibilities.
 
@@ -45,21 +45,32 @@ For every implementation task, consult its traceability row and all linked rules
 Verified by source/configuration inspection and read-only tooling on 2026-10-28/29:
 
 - Installed Laravel 13.39.0, Tyro Dashboard 1.59.0, Inertia Laravel 3.5.2, Pest 5.3.4. `composer.json` specifies compatible ranges rather than these exact patch releases. Recheck installed versions before implementation.
-- App code contains the starter User, controller, provider, Inertia middleware and welcome page. No ticket-domain implementation exists.
-- Tyro package routes/configuration and many published Blade templates exist. User currently lacks Tyro role integration and email-verification enforcement. End-to-end authentication/dashboard readiness is not proven.
-- Initially inspected SQLite contained only framework tables. MySQL was then configured but returned error 1049 for missing `ticketms`. After the owner created it, a fresh read-only query verified database `ticketms`, server **8.0.33**, and schema inspection returned no tables. Connection is now verified; application/package schema initialization is future work.
-- Database queues, failed-job and batch configuration exist. Queue `after_commit` currently defaults to false. No app scheduled tasks are registered.
-- Only starter example tests exist. Feature tests are configured for in-memory SQLite. Production lock/concurrency tests must use isolated MySQL.
+- Existing starter and Tyro integration remain in place. P03–P08 add authenticated ticket workflows, assignment/claim, conversations/files, delivery workers, imports and role-scoped analytics within the existing Tyro shell. P09 adds local security, dependency and CI hardening; no production deployment testing is part of local completion.
+- Tyro package routes/configuration and many published Blade templates exist. The app exposes a read-only Spatie-to-Tyro role adapter, and duplicate management surfaces are blocked. Feature tests cover authentication/authorization contracts; interactive browser and responsive behavior still need owner review.
+- Initially inspected SQLite contained only framework tables. MySQL was then configured but returned error 1049 for missing `ticketms`. After the owner created it, read-only inspection verified MySQL **8.0.33** and an empty `ticketms` schema. The authorized implementation then applied 30 migrations and seeded the baseline configuration. At validation, `users=0`, `access_roles=3` (`admin`, `agent`, `customer`), Tyro `roles=0`, `categories=1`, `priorities=4`, `calendar_versions=1`, and `sla_policies=1`.
+- Database queues, failed-job and batch configuration exist. `composer run dev` starts the local server, Vite, logs, a listener for every application queue and the Laravel scheduler. Queue `after_commit` currently defaults to false; durable notification intents and scheduled recovery provide the required handoff.
+- Feature tests use in-memory SQLite. Latest full suite passed **114 tests and 621 assertions**; the opt-in MySQL suite passed **31 tests and 104 assertions** against a disposable schema.
 - The original source brief, now `docs/02-initial-requirements.md`, was the only pre-existing file under docs. `.ai/rules` and `.git` were absent during inspection; no repository history or clean working-tree claim can be made.
-- Spatie Laravel Permission is requested but is not installed. No package changes are authorized by this documentation task.
+- Spatie Laravel Permission **8.3.2** is installed and configured with prefixed tables. The User model exposes read-only Tyro role/privilege adapters, and Tyro's duplicate API and role-management routes are disabled. The application permission registry and scoped ticket authorization are implemented; app-owned user/role lifecycle and permission-inspection pages are available under Access; role creation, membership editing and permission-grant editing remain out of scope.
+- Database validation performed: schema constraint, rollback/reapplication, seeder idempotency, ticket workflow, analytics bucketing, simultaneous assignment and last-admin tests. MySQL integration tests run against a random disposable schema, not the working `ticketms` database.
+
+## Local handoff
+
+1. Confirm `.env` points to the existing `ticketms` database. It already has its migrations and baseline configuration; do not reset or wipe it.
+2. The working database already has an admin account. Use the credentials you previously set up. On a fresh local database, run `php artisan ticketing:make-admin` and enter the administrator name, email and password interactively.
+3. The working database has `demo-agent@ticketms.test` and `demo-customer@ticketms.test` accounts, each verified and assigned to its role. Their temporary local passwords were provided in the implementation handoff. For a fresh database, set the corresponding `TICKETING_AGENT_*` and `TICKETING_CUSTOMER_*` values in `.env` and run `php artisan db:seed --class=TicketingUsersSeeder`. Keep credentials out of source control.
+4. Run `composer run dev` to start the app. The worker now listens on `imports`, `sla`, `notifications-database`, `notifications-mail`, and `default`; the scheduler runs alongside it. Stop the processes with Ctrl+C.
+5. Two-factor authentication is disabled by `TICKETING_TWO_FACTOR_ENABLED=false` in the current local `.env`; the PHPUnit environment keeps the security policy enabled for its tests. Review ticket creation, assignment, replies, attachments, imports, bulk actions, notifications and role-scoped dashboards in the browser. Email uses the configured local mailer.
+
+Browser/responsive acceptance and role-specific end-to-end use require your local hands-on review. Record any issues and run `php artisan test --compact` after fixes. See [testing strategy](10-testing-strategy.md) for scenarios and current automated coverage.
 
 ## Decision authority
 
 1. Owner-approved requirements and later corrections override this baseline.
 2. PRD decision register records discussion approvals and explicitly proposed design details.
 3. Business logic defines calculations; database design implements their integrity requirements; security defines access scope. Update all affected documents together when a decision changes.
-4. Do not infer approval to implement from approval to document. Stop after document review until explicit implementation approval.
+4. Database implementation was explicitly approved. The remaining product features still require their own approved task scope.
 
 ## Validation of this documentation
 
-The implementation plan contains a documentation validation ledger. It distinguishes performed link/coverage/consistency review from unexecuted application tests, migrations, benchmarks and compatibility spikes. Release gates remain future work.
+The implementation plan contains both the original documentation review and the current database implementation validation ledger. It distinguishes completed schema tests from unexecuted product acceptance, authorization, performance and operational release gates.

@@ -2,23 +2,22 @@
 
 namespace Database\Factories;
 
+use App\Models\BulkOperation;
 use App\Models\BulkOperationItem;
+use App\Models\Ticket;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
-/**
- * @extends Factory<BulkOperationItem>
- */
+/** @extends Factory<BulkOperationItem> */
 class BulkOperationItemFactory extends Factory
 {
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function definition(): array
     {
         return [
-            //
+            'bulk_operation_id' => BulkOperation::factory(),
+            'subject_type' => 'ticket',
+            'subject_id' => fn (): int => Ticket::factory()->create()->getKey(),
+            'result' => 'pending',
         ];
     }
 }

@@ -1,7 +1,7 @@
 @php
     $isAdmin = false;
     if (auth()->user() && method_exists(auth()->user(), 'hasRole')) {
-        $adminRoles = config('tyro-dashboard.admin_roles', ['admin', 'super-admin']);
+        $adminRoles = config('tyro-dashboard.admin_roles', ['admin']);
         foreach ($adminRoles as $role) {
             if (auth()->user()->hasRole($role)) {
                 $isAdmin = true;

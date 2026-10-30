@@ -22,7 +22,7 @@ flowchart LR
   Workers --> Services
 ```
 
-## Proposed placement, not files already implemented
+## Target application structure
 
 | Location | Responsibility |
 | --- | --- |
@@ -39,7 +39,7 @@ flowchart LR
 | `app/Services/Bulk/` | BulkOperationService owns operation/item results and delegates each item to its module service |
 | `app/Services/Notifications/` | NotificationDeliveryService owns durable delivery/channel coordination; Laravel Notification classes own channel formatting |
 | `app/Services/Authorization/` | EffectivePermissionService and minimal TyroAccessAdapter |
-| `app/Queries/` | TicketVisibilityQuery and AnalyticsQuery only where query reuse warrants extraction |
+| `app/Services/Analytics/` | Role-scoped dashboard aggregates, Dhaka date windows, resolution snapshots and bounded admin cache |
 | `app/Enums/` | TicketStatus, MessageVisibility, interval/escalation states, import states |
 | `app/Models/` | Typed relationships, casts, explicit scopes; no SMTP/storage side effects in model observers |
 | `app/Jobs/`, `app/Events/`, `app/Listeners/`, `app/Notifications/` | Named async boundaries described in background-processing |
@@ -52,15 +52,15 @@ Create directories through normal future Laravel generators only when needed. Do
 
 ## ADR01 — Spatie is the sole authorization authority
 
-Owner explicitly requested Spatie. It is not installed. Official [compatibility documentation](https://spatie.be/docs/laravel-permission/v8/prerequisites) lists Laravel 13 support for package majors 7–8 with PHP 8.3+. Select and pin a compatible major during the approved implementation phase after Composer resolution; never assume the current API.
+Spatie is the sole grant store. Installed version is **8.3.2** (PHP 8.4.27, Laravel 13.39.0); `config/permission.php` uses the app Role/Permission models and `access_*` table names. Official [compatibility documentation](https://spatie.be/docs/laravel-permission/v8/prerequisites) lists Laravel 13 support. The User model exposes read-only role/privilege names for Tyro dashboard checks; Tyro's core API and duplicate user/role/privilege management paths are disabled/blocked. The permission registry, effective resolver, role lifecycle services, and ticket ownership/permission checks are implemented; app-owned user/role lifecycle and permission-inspection pages are implemented under `AccessManagementController`; role creation, membership editing and permission-grant editing remain out of scope.
 
 Tyro `HasTyroRoles` defines `roles()`, `assignRole()`, `hasRole()` and `can()`. Its `can()` can return true before a resource policy. Native Tyro user controllers synchronize Tyro roles directly. Adding both role traits to User is not a valid integration.
 
 Required design:
 
 1. User uses Spatie `HasRoles`, not `HasTyroRoles`. No direct user permissions; roles are the manageable grant unit. Use `web` guard and prefixed tables `access_roles`, `access_permissions`, `access_model_has_roles`, `access_role_has_permissions`, `access_model_has_permissions` to avoid collision with package migrations.
-2. App-owned role/user management uses Spatie APIs and the effective-permission rules in security. Disable native Tyro role/privilege/user-management write routes through supported feature configuration; replace their menu destinations with app routes while preserving Tyro layout. Audit all direct URLs, not only menus.
-3. Add only required read adapters (`tyroRoleSlugs()`, `tyroPrivilegeSlugs()`, `hasPrivilege()` and any installed template-proven compatibility calls). They read effective Spatie roles/permissions; they never write Tyro RBAC tables or override `can()` to bypass policies.
+2. App-owned role/user management uses Spatie APIs and the effective-permission rules in security. Tyro's core API is disabled through `config/tyro.php`; native dashboard user/role/privilege paths return 404 through app middleware, and their sidebar links are hidden. Replace these destinations with app routes while preserving the Tyro layout. Audit direct URLs, not only menus.
+3. Add only required read adapters (`tyroRoleSlugs()`, `tyroPrivilegeSlugs()`, `hasPrivilege()` and any installed template-proven compatibility calls). The first three are implemented on User and read active Spatie roles/permissions; they never write Tyro RBAC tables or override `can()` to bypass policies.
 4. Preserve package login/profile/2FA only after proving they do not assume Tyro Role models or hard-delete users. Registration's role-assignment path needs an app-owned adaptation: create customer membership using Spatie after validation in the account transaction, never pass a Tyro Role model to Spatie.
 5. Spatie's default global permission Gate callback must not bypass ownership. Register an application permission resolver (supported package config) for named permission abilities only, distinct from policy verbs. Effective checks exclude disabled/deleted users/roles. No global administrator `Gate::before(true)`; policies grant admin scope but services still enforce workflow/integrity.
 6. Keep core Tyro middleware aliases intact. Use app middleware aliases for ticket/admin routes; adapt package dashboard access through the read adapter. Never register conflicting Spatie `role`/`permission` aliases over Tyro aliases.

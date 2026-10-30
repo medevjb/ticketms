@@ -1,6 +1,6 @@
 # Business logic specification
 
-Normative proposed implementation behavior. IDs BR01–BR16 are traced to requirements and tests. D12 implementation details remain subject to final document approval.
+Normative approved behavior for application workflows. IDs BR01–BR16 are traced to requirements and tests. P05 implements public replies, staff-only notes, staged private attachments, scoped downloads, moderation, customer-reply SLA resumption, and explicit reopen-with-message behavior. P08 implements role-scoped analytics using the metric definitions below; consult D12 for delivered scope and tested limits.
 
 Implementation organization: follow the service pattern in [architecture ADR06](04-architecture.md#adr06--service-pattern-for-business-logic). TicketService, AssignmentService, ConversationService and SlaService enforce the same rules for web requests, queued work, imports and bulk operations. The outer atomic operation owns its transaction; module services recheck policy/state and write activity/delivery intent together. The architecture choice does not change these business rules.
 
@@ -55,7 +55,7 @@ Eligible = active nondeleted user with active effective `agent` role, active pro
 
 Workload = assigned tickets in Open/In Progress/Waiting for Customer, nondeleted, including disabled tickets. Choose smallest count, then oldest `last_auto_assigned_at` (null first), then smallest user ID. Update timestamp only for successful automatic assignment. Assignment does not change ticket status or reset SLA. Manual reassignment retains status, records old/new assignee and notifies both as appropriate. Repeated same assignment is a no-op, not another history/notification.
 
-All assignment paths use shared coordinator and ticket locks described in schema. A self-claim loser gets conflict; never silently reports success with someone else's assignment. Unassigned work automatically considered on creation, when eligibility changes, and periodic bounded recovery; existing manual assignments are never stolen automatically.
+All assignment paths use the shared coordinator and ticket locks described in the schema. A self-claim loser gets conflict; never silently reports success with someone else's assignment. Automatic selection runs when a ticket is created; changing eligibility does not move existing tickets, which remain available for admin assignment or agent claim. Existing manual assignments are never stolen automatically.
 
 ## BR05 — Ticket state graph
 
@@ -111,7 +111,7 @@ Admin clones a published calendar/policy to draft, edits windows/holidays/target
 
 ## BR10 — Conversations and files
 
-Messages append-only text, public or internal. Public edit is not initial scope; admin moderation hides/archives with reason without deleting bytes/history. Public redaction shows a neutral marker; internal redaction never creates a customer-visible marker. Downloads recheck parent ticket, message visibility, lifecycle and actor scope; disabled/deleted file/message denies download even if path is known. Customers get 404 for internal resources. Store neither message bodies nor original attachment URLs in activity/notification payloads. File validation failure rejects entire submission; storage failure never leaves a successful-looking ticket without required files.
+Messages append-only text, public or internal. Public edit is not initial scope; admin moderation hides/archives with reason without deleting bytes/history. Public redaction shows a neutral marker; internal notes and their attachment metadata never enter the customer message list or ticket-level attachment list. Downloads recheck parent ticket, message visibility, lifecycle and actor scope; disabled/deleted file/message denies download even if path is known. Customers get 404 for internal resources. Store neither message bodies nor original attachment names/paths in activity/notification payloads. File validation failure rejects the entire submission; staged objects are compensated if authorization, idempotency, database, or storage operations fail. Waiting customer public replies close the pause interval and resume SLA inside the same transaction. Resolved public replies require an explicit reopen flag, a reason, and the message in one transaction; Closed remains final.
 
 ## BR11 — Bulk actions
 
