@@ -36,7 +36,7 @@ flowchart LR
 | `app/Services/Admin/` | UserService, RoleService, CategoryService, PriorityService, CalendarService, SlaPolicyService; shared guarded RecordLifecycleService only where it removes actual duplication |
 | `app/Services/Sla/` | SlaService owns SLA projection/escalation decisions; BusinessCalendar performs pure arithmetic with immutable inputs and an explicit clock |
 | `app/Services/Imports/` | TicketImportService owns CSV run/checkpoint orchestration and delegates each ticket creation to TicketService |
-| `app/Services/Bulk/` | BulkOperationService owns operation/item results and delegates each item to its module service |
+| `app/Services/BulkOperations/` | BulkOperationService processes bounded selections per record and returns current-request results; it does not persist batch history |
 | `app/Services/Notifications/` | NotificationDeliveryService owns durable delivery/channel coordination; Laravel Notification classes own channel formatting |
 | `app/Services/Authorization/` | EffectivePermissionService and minimal TyroAccessAdapter |
 | `app/Services/Analytics/` | Role-scoped dashboard aggregates, Dhaka date windows, resolution snapshots and bounded admin cache |
@@ -97,7 +97,7 @@ Responsibilities and boundaries:
 5. Jobs/listeners are adapters invoking these services. Models own relationships/casts/scopes; query objects own reusable reads; Blade views only render prepared data. No business calculations duplicated across entry points or observers.
 6. Shared RecordLifecycleService, if justified, coordinates audit/availability mechanics only; module services and policies retain module-specific guards (Closed-only archive, protected roles/current policy, last admin). Never resolve arbitrary model classes or bypass guards through generic CRUD.
 7. Return typed results/models or domain exceptions; controllers translate them to the documented response, jobs apply retry classification. Do not catch exceptions and return false success. Inject concrete services by default; use interfaces at genuinely replaceable external boundaries, not one interface/implementation pair for every service.
-8. Verify business behavior through feature tests and targeted service integration tests. Pure calendar helpers may have unit tests; do not mock the service under test or assert only that a controller called a method. Service reuse must preserve policies, transaction atomicity and idempotency across HTTP, import, bulk and queue callers.
+8. Verify business behavior through feature tests and targeted service integration tests. Pure calendar helpers may have unit tests; do not mock the service under test or assert only that a controller called a method. Service reuse must preserve policies and transaction atomicity across HTTP, import, bulk and queue callers. Bulk result summaries exist only for the current response; per-record command receipts remain where the mutation uses them.
 
 Trade-off: grouping related operations in a service reduces entry-point duplication but can grow into a large class. Split by domain responsibility when cohesion or dependency direction suffers, not by arbitrary class size. This decision changes code organization only; approved business rules, schema and permissions remain unchanged.
 

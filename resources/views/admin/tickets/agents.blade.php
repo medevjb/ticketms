@@ -2,7 +2,7 @@
 @section('title', 'Ticket assignment')
 @section('breadcrumb')<a href="{{ route($dashboardRoute::name('index')) }}">Dashboard</a><span class="breadcrumb-separator">/</span><a href="{{ route('dashboard.tickets.index') }}">Tickets</a><span class="breadcrumb-separator">/</span><span>Agent assignment</span>@endsection
 @section('content')
-<div class="page-header"><div><h1 class="page-title">Ticket assignment</h1><p class="page-description">Automatic assignment chooses the eligible agent with the smallest active workload, then the longest time since their last automatic assignment.</p></div></div>
+    <div class="page-header"><div><h1 class="page-title">Ticket assignment</h1><p class="page-description">Automatic assignment chooses the eligible agent with the smallest active workload, then the longest time since their last automatic assignment.</p></div><a class="btn btn-secondary" href="{{ route('dashboard.agents.index') }}">Manage agents</a></div>
 
 <div class="card"><div class="card-body"><div class="table-responsive"><table class="table"><thead><tr><th>Agent</th><th>Profile</th><th>Automatic assignment</th><th>Active workload</th></tr></thead><tbody>
 @forelse($agents as $agentProfile)

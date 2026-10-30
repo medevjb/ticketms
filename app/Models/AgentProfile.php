@@ -14,6 +14,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * @property CarbonImmutable|null $last_auto_assigned_at
+ * @property CarbonImmutable|null $invitation_expires_at
+ * @property CarbonImmutable|null $invitation_accepted_at
  */
 #[Fillable(['auto_assignment_enabled'])]
 class AgentProfile extends Model
@@ -35,6 +37,8 @@ class AgentProfile extends Model
             'deleted_at' => 'immutable_datetime',
             'auto_assignment_enabled' => 'boolean',
             'last_auto_assigned_at' => 'immutable_datetime',
+            'invitation_expires_at' => 'immutable_datetime',
+            'invitation_accepted_at' => 'immutable_datetime',
         ];
     }
 

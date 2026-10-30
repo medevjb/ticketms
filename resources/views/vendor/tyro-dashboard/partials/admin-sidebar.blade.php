@@ -101,6 +101,14 @@
         <!-- Admin Menu -->
         <div class="sidebar-section">
             <div class="sidebar-section-title">Administration</div>
+            @if(auth()->user() && in_array('admin', auth()->user()->tyroRoleSlugs(), true) && auth()->user()->can('agents.manage'))
+            <a href="{{ route('dashboard.agents.index') }}" class="sidebar-link {{ request()->routeIs('dashboard.agents.*', 'dashboard.ticket-agents.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2m14 0h6v-2a4 4 0 00-3-3.87M14 3.13a4 4 0 010 7.75M14 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                Agents
+            </a>
+            @endif
             @if(auth()->user() && in_array('admin', auth()->user()->tyroRoleSlugs(), true) && auth()->user()->can('categories.manage'))
             <a href="{{ route('dashboard.categories.index') }}" class="sidebar-link {{ request()->routeIs('dashboard.categories.*') ? 'active' : '' }}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

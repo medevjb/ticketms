@@ -3,7 +3,6 @@
 namespace App\Services\Tickets;
 
 use App\Enums\TicketBulkAction;
-use App\Models\Ticket;
 use App\Models\User;
 use App\Services\BulkOperations\BulkOperationService;
 
@@ -24,10 +23,6 @@ class TicketBulkService
         return $this->operations->execute(
             $actor,
             'tickets.bulk',
-            'tickets',
-            Ticket::class,
-            $action->value,
-            $operationKey,
             $ticketIds,
             function (int $ticketId) use ($actor, $action, $operationKey, $expectedVersions): void {
                 $version = $expectedVersions[$ticketId] ?? throw new \InvalidArgumentException('A selected ticket version is required.');
@@ -40,7 +35,6 @@ class TicketBulkService
                     TicketBulkAction::Restore => $this->tickets->restore($actor, $ticketId, $version, $itemOperationKey),
                 };
             },
-            $expectedVersions,
         );
     }
 

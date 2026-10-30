@@ -19,15 +19,11 @@ class AccessLifecycleBulkService
      * @param  list<int>  $ids
      * @return array{succeeded: int, failed: list<array{id: int, message: string}>}
      */
-    public function users(User $actor, LifecycleBulkAction $action, string $operationKey, array $ids): array
+    public function users(User $actor, LifecycleBulkAction $action, array $ids): array
     {
         return $this->operations->execute(
             $actor,
             'users.manage',
-            'users',
-            User::class,
-            $action->value,
-            $operationKey,
             $ids,
             function (int $id) use ($actor, $action): void {
                 $target = User::withTrashed()->findOrFail($id);
@@ -45,15 +41,11 @@ class AccessLifecycleBulkService
      * @param  list<int>  $ids
      * @return array{succeeded: int, failed: list<array{id: int, message: string}>}
      */
-    public function roles(User $actor, LifecycleBulkAction $action, string $operationKey, array $ids): array
+    public function roles(User $actor, LifecycleBulkAction $action, array $ids): array
     {
         return $this->operations->execute(
             $actor,
             'roles.manage',
-            'roles',
-            Role::class,
-            $action->value,
-            $operationKey,
             $ids,
             function (int $id) use ($actor, $action): void {
                 $target = Role::withTrashed()->findOrFail($id);

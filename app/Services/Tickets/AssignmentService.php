@@ -29,17 +29,37 @@ class AssignmentService
     ) {}
 
     /**
-     * Select and assign the least-loaded eligible agent while the ticket creation transaction is open.
+     * Assign the least-loaded agent with a round-robin-style fairness tie-break.
+     *
+     * Selection steps:
+     * 1. Lock the shared assignment coordinator so ticket creation, claims, manual assignment,
+     *    eligibility changes, and agent deactivation follow the same lock order.
+     * 2. Lock the ticket and stop if it is already assigned or is inactive, archived, resolved,
+     *    or closed.
+     * 3. Load active agent profiles enabled for automatic assignment whose users and agent roles
+     *    are also active; lock the profiles and then the corresponding user rows.
+     * 4. Count each candidate's non-archived Open, In Progress, and Waiting for Customer tickets.
+     * 5. Choose the lowest workload; ties go to the agent least recently auto-assigned, then the
+     *    lowest user ID for a stable final tie-break.
+     * 6. Recheck the selected user's agent role, assign and increment the ticket lock version,
+     *    update the agent's last-auto-assigned time, and write activity/notification records.
+     *
+     * Every step runs inside the ticket creation transaction, so a failure rolls back the ticket
+     * and assignment together.
      */
     public function assignAutomatically(Ticket $ticket, string $operationKey): Ticket
     {
         return DB::transaction(function () use ($ticket, $operationKey): Ticket {
+            // Step 1: serialize assignment-related work before taking ticket, profile, or user locks.
             $this->lockCoordinator();
+
+            // Step 2: re-read the ticket under lock; another operation may have assigned or closed it.
             $lockedTicket = Ticket::query()->whereKey($ticket->getKey())->lockForUpdate()->firstOrFail();
             if ($lockedTicket->assigned_agent_id !== null || ! $this->isAssignable($lockedTicket)) {
                 return $lockedTicket;
             }
 
+            // Step 3: only agents with an active profile and automatic assignment enabled are candidates.
             $profiles = $this->profilesForAgents(automaticOnly: true, lock: true);
             if ($profiles->isEmpty()) {
                 $this->activity->record(
@@ -55,6 +75,7 @@ class AssignmentService
             }
 
             $agentIds = array_values($profiles->pluck('user_id')->map(fn (mixed $id): int => (int) $id)->all());
+            // Lock active user rows in ID order, then discard any profile whose user is no longer active.
             $users = $this->lockActiveUsers($agentIds);
             $profiles = $profiles->filter(fn (AgentProfile $profile): bool => $users->has((int) $profile->user_id));
             if ($profiles->isEmpty()) {
@@ -70,7 +91,10 @@ class AssignmentService
                 return $lockedTicket;
             }
 
+            // Step 4: workload includes non-archived tickets in states that still need an agent's work.
             $workloads = $this->workloads(array_values($profiles->pluck('user_id')->map(fn (mixed $id): int => (int) $id)->all()));
+
+            // Step 5: least-loaded first; use last assignment time and user ID to break ties predictably.
             $profiles = $profiles->sort(function (AgentProfile $left, AgentProfile $right) use ($workloads): int {
                 $leftWorkload = (int) ($workloads[(int) $left->user_id] ?? 0);
                 $rightWorkload = (int) ($workloads[(int) $right->user_id] ?? 0);
@@ -98,6 +122,7 @@ class AssignmentService
             }
 
             $agent = $users->get((int) $profiles->user_id);
+            // Step 6: confirm the chosen locked user still carries the active agent role before writing.
             if ($agent === null || ! in_array('agent', $agent->tyroRoleSlugs(), true)) {
                 $this->activity->record(
                     $lockedTicket,
@@ -111,16 +136,10 @@ class AssignmentService
                 return $lockedTicket;
             }
 
+            // Step 7: assign, advance the fairness timestamp, and record the outcome in the same transaction.
             $this->writeAssignment($lockedTicket, $agent, null);
             $profiles->forceFill(['last_auto_assigned_at' => CarbonImmutable::now('UTC')])->save();
-            $activity = $this->activity->record(
-                $lockedTicket,
-                null,
-                ActorKind::System,
-                'ticket.auto_assigned',
-                $operationKey,
-                ['assigned_agent_id' => ['before' => null, 'after' => $agent->getKey()], 'workload_before' => (int) ($workloads[(int) $agent->getKey()] ?? 0)],
-            );
+            $activity = $this->activity->record($lockedTicket,null,ActorKind::System,'ticket.auto_assigned',$operationKey,['assigned_agent_id' => ['before' => null, 'after' => $agent->getKey()], 'workload_before' => (int) ($workloads[(int) $agent->getKey()] ?? 0)]);
             $this->activity->queueDeliveryIntents(
                 $activity,
                 $lockedTicket,
@@ -135,6 +154,8 @@ class AssignmentService
 
     public function assign(User $actor, int $ticketId, int $agentId, int $expectedVersion, string $operationKey): Ticket
     {
+        // Manual assignment has the same coordinator/row-lock discipline, but does not require
+        // automatic assignment to be enabled for the selected agent.
         $this->authorizeAdministrator($actor);
         $payload = ['ticket_id' => $ticketId, 'agent_id' => $agentId, 'lock_version' => $expectedVersion];
 
@@ -153,8 +174,12 @@ class AssignmentService
             if ($receiptTicket !== null) {
                 return $receiptTicket;
             }
+
+            // Reject stale ticket forms and terminal/inactive tickets before checking the target agent.
             $this->assertVersion($ticket, $expectedVersion);
             $this->assertAssignable($ticket);
+
+            // Manual targets still need an active user, active profile, and the active agent role.
             if ($agent === null || $profile === null || ! in_array('agent', $agent->tyroRoleSlugs(), true)) {
                 throw ValidationException::withMessages(['agent_id' => 'Choose an active agent with an active agent profile.']);
             }
@@ -188,6 +213,8 @@ class AssignmentService
 
     public function claim(User $actor, int $ticketId, int $expectedVersion, string $operationKey): Ticket
     {
+        // A claim is available to an active agent with an active profile; auto-assignment eligibility
+        // is a separate setting and does not control an agent's ability to claim a queue ticket.
         $this->authorizeAgent($actor);
         $payload = ['ticket_id' => $ticketId, 'lock_version' => $expectedVersion];
 
@@ -206,6 +233,8 @@ class AssignmentService
             if ($profile === null) {
                 throw new AuthorizationException;
             }
+
+            // The queue ticket must still be unassigned after its row lock; a competing claim gets 409.
             if ($ticket->assigned_agent_id !== null) {
                 throw new HttpException(409, 'This ticket has already been claimed. Refresh the ticket list.');
             }
@@ -346,6 +375,8 @@ class AssignmentService
     /** @return Collection<int, AgentProfile> */
     private function profilesForAgents(bool $automaticOnly, bool $lock): Collection
     {
+        // The role and profile conditions are deliberate: a user with only the agent role is not
+        // assignable until their agent_profiles row exists and is active.
         $query = AgentProfile::query()
             ->active()
             ->when($automaticOnly, fn (Builder $builder) => $builder->where('auto_assignment_enabled', true))
@@ -381,6 +412,7 @@ class AssignmentService
             return [];
         }
 
+        // Keep this definition aligned with the open-work states shown in the assignment roster.
         return DB::table('tickets')
             ->select('assigned_agent_id')
             ->selectRaw('COUNT(*) AS workload')

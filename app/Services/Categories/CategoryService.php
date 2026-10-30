@@ -161,17 +161,13 @@ class CategoryService
     /** @param list<int> $categoryIds
      * @return array{succeeded: int, failed: list<array{id: int, message: string}>}
      */
-    public function bulk(User $actor, CategoryBulkAction $action, array $categoryIds, string $operationKey): array
+    public function bulk(User $actor, CategoryBulkAction $action, array $categoryIds): array
     {
         $this->authorizeManagement($actor);
 
         return $this->bulkOperations->execute(
             $actor,
             'categories.manage',
-            'categories',
-            Category::class,
-            $action->value,
-            $operationKey,
             $categoryIds,
             function (int $categoryId) use ($action, $actor): void {
                 $category = Category::withTrashed()->findOrFail($categoryId);

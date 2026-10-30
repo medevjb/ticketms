@@ -74,7 +74,7 @@ class AccessManagementController extends BaseController
     public function bulkUsers(BulkUserLifecycleRequest $request, AccessLifecycleBulkService $bulk): RedirectResponse
     {
         $data = $request->validated();
-        $result = $bulk->users($request->user(), LifecycleBulkAction::from($data['action']), $data['operation_key'], array_values(array_map('intval', $data['selected_ids'])));
+        $result = $bulk->users($request->user(), LifecycleBulkAction::from($data['action']), array_values(array_map('intval', $data['selected_ids'])));
 
         return $this->bulkRedirect('dashboard.access.users', 'users', $result);
     }
@@ -82,7 +82,7 @@ class AccessManagementController extends BaseController
     public function bulkRoles(BulkRoleLifecycleRequest $request, AccessLifecycleBulkService $bulk): RedirectResponse
     {
         $data = $request->validated();
-        $result = $bulk->roles($request->user(), LifecycleBulkAction::from($data['action']), $data['operation_key'], array_values(array_map('intval', $data['selected_ids'])));
+        $result = $bulk->roles($request->user(), LifecycleBulkAction::from($data['action']), array_values(array_map('intval', $data['selected_ids'])));
 
         return $this->bulkRedirect('dashboard.access.roles', 'roles', $result);
     }

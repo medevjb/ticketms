@@ -1,14 +1,11 @@
 <?php
 
 use App\Models\ActivityEntry;
-use App\Models\BulkOperation;
-use App\Models\BulkOperationItem;
 use App\Models\Category;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\AuthorizationPermissionSeeder;
 use Database\Seeders\TicketingConfigurationSeeder;
-use Illuminate\Support\Str;
 
 beforeEach(function (): void {
     $this->seed([TicketingConfigurationSeeder::class, AuthorizationPermissionSeeder::class]);
@@ -101,9 +98,7 @@ it('reports successful and failed category bulk actions without losing successfu
     $archived = Category::factory()->create(['is_active' => false]);
     $archived->delete();
 
-    $operationKey = (string) Str::uuid();
     $payload = [
-        'operation_key' => $operationKey,
         'action' => 'disable',
         'selected_ids' => [$enabled->id, $archived->id],
     ];
@@ -113,10 +108,7 @@ it('reports successful and failed category bulk actions without losing successfu
     $this->post(route('dashboard.categories.bulk'), $payload)->assertRedirect();
 
     expect($enabled->fresh()->is_active)->toBeFalse()
-        ->and(Category::withTrashed()->findOrFail($archived->id)->trashed())->toBeTrue()
-        ->and(BulkOperation::query()->where('operation_key', $operationKey)->value('succeeded_count'))->toBe(1)
-        ->and(BulkOperation::query()->where('operation_key', $operationKey)->value('failed_count'))->toBe(1)
-        ->and(BulkOperationItem::query()->where('bulk_operation_id', BulkOperation::query()->where('operation_key', $operationKey)->value('id'))->count())->toBe(2);
+        ->and(Category::withTrashed()->findOrFail($archived->id)->trashed())->toBeTrue();
 });
 
 it('rejects category management from a custom role even when it has the registered permission', function (): void {

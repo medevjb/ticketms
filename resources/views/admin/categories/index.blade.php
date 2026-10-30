@@ -57,7 +57,7 @@
 <div class="card">
     <form action="{{ route('dashboard.categories.bulk') }}" method="POST" id="category-bulk-form">
         @csrf
-        <input type="hidden" name="operation_key" value="{{ old('operation_key', (string) \Illuminate\Support\Str::uuid()) }}">
+
         <div class="card-body" style="border-bottom: 1px solid var(--border); display:flex; align-items:center; gap:.75rem; justify-content:space-between; flex-wrap:wrap;">
             <label style="display:inline-flex; align-items:center; gap:.5rem;">
                 <input type="checkbox" id="select-all-categories" aria-label="Select all categories on this page">

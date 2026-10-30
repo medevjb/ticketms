@@ -30,7 +30,7 @@ All routes below require active authenticated verified identity; staff require 2
 | POST `/support/tickets/{ticket}/messages` | messages.store | public body/files,operation_key,expected_version |
 | POST `/support/tickets/{ticket}/notes` | notes.store | internal body/files,operation_key,expected_version; assigned staff only |
 | GET `/support/attachments/{attachment}/download` | attachments.download | Policy + parent visibility + availability; streamed attachment |
-| POST `/support/admin/{module}/bulk` | admin.bulk | Explicit module/action enum, operation_key, IDs,expected_versions,parameters,reason |
+| POST `/support/admin/{module}/bulk` | admin.bulk | Explicit module/action enum, IDs,expected_versions,parameters,reason; ticket bulk also accepts operation_key for per-ticket command receipts; response contains per-item results and no batch history is stored |
 | POST `/support/admin/tickets/{ticket}/availability` | admin.tickets.availability | is_active boolean,reason,expected_version |
 | DELETE `/support/admin/tickets/{ticket}` | admin.tickets.archive | Closed only; soft-delete; reason,expected_version |
 | POST `/support/admin/tickets/{ticket}/restore` | admin.tickets.restore | Explicit archive lookup/admin; restore disabled Closed |

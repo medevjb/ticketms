@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AccessManagementController;
+use App\Http\Controllers\Admin\AgentManagementController;
 use App\Http\Controllers\Admin\AnalyticsController;
 use App\Http\Controllers\Admin\CalendarController;
 use App\Http\Controllers\Admin\CategoryController;
@@ -52,6 +53,18 @@ Route::prefix(trim((string) config('tyro-dashboard.routes.prefix', 'dashboard'),
     ->middleware(['auth', 'tyro-dashboard.admin'])
     ->name('dashboard.')
     ->group(function (): void {
+        Route::middleware('can:agents.manage')->group(function (): void {
+            Route::get('/agents', [AgentManagementController::class, 'index'])->name('agents.index');
+            Route::get('/agents/create', [AgentManagementController::class, 'create'])->name('agents.create');
+            Route::post('/agents', [AgentManagementController::class, 'store'])->name('agents.store');
+            Route::post('/agents/{agent}/profile', [AgentManagementController::class, 'createProfile'])
+                ->whereNumber('agent')->name('agents.profile.create');
+            Route::post('/agents/{agent}/invitation', [AgentManagementController::class, 'resendInvitation'])
+                ->whereNumber('agent')->name('agents.invitation.resend');
+            Route::patch('/agents/{agent}/availability', [AgentManagementController::class, 'setActive'])
+                ->whereNumber('agent')->name('agents.availability');
+        });
+
         Route::middleware('can:agents.manage')->group(function (): void {
             Route::get('/ticket-agents', [TicketAssignmentController::class, 'agents'])->name('ticket-agents.index');
             Route::patch('/ticket-agents/{agent}/automatic-assignment', [TicketAssignmentController::class, 'setAutoAssignment'])

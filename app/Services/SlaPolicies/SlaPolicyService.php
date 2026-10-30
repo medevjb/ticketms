@@ -296,17 +296,13 @@ class SlaPolicyService
     /** @param list<int> $policyIds
      * @return array{succeeded: int, failed: list<array{id: int, message: string}>}
      */
-    public function bulk(User $actor, SlaPolicyBulkAction $action, array $policyIds, string $operationKey): array
+    public function bulk(User $actor, SlaPolicyBulkAction $action, array $policyIds): array
     {
         $this->authorizeManagement($actor);
 
         return $this->bulkOperations->execute(
             $actor,
             'sla.manage',
-            'sla_policies',
-            SlaPolicy::class,
-            $action->value,
-            $operationKey,
             $policyIds,
             function (int $policyId) use ($action, $actor): void {
                 $policy = SlaPolicy::withTrashed()->findOrFail($policyId);

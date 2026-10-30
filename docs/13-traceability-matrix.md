@@ -6,7 +6,7 @@ Source references are section numbers in [02-initial-requirements.md](02-initial
 | --- | --- | --- | --- | --- | --- |
 | 01 Ticket management | FR01 | BR01–BR03,BR05 | tickets,command_receipts,activity_entries | TicketController,Form Requests,TicketPolicy,ticket services | T01,T03,T09,T18,T19 |
 | 02 Ticket numbering | FR02 | BR03 | ticket_sequences,tickets.number | TicketService::create,number allocator | T02,T19 |
-| 03 Roles/permissions | FR03 | BR01,BR02,BR16 | users,access roles/permissions/pivots,bulk operations | EffectivePermissionService,AccessManagementController,AccessLifecycleBulkService,UserLifecycleService,RoleLifecycleService,Tyro read adapter | T03–T05,T15,T18,T21,T22 |
+| 03 Roles/permissions | FR03 | BR01,BR02,BR16 | users,access roles/permissions/pivots,activity entries | EffectivePermissionService,AccessManagementController,AccessLifecycleBulkService,UserLifecycleService,RoleLifecycleService,Tyro read adapter | T03–T05,T15,T18,T21,T22 |
 | 04 Assignment | FR04 | BR04 | tickets.assigned_agent_id,agent_profiles,settings coordinator | AssignmentService::assign,auto-assignment query/job | T07,T08,T22 |
 | 05 Concurrent assignment | FR05,NFR01 | BR04,BR15 | ticket lock/version,coordinator,receipts,activity | AssignmentService::claim,AssignmentService::assign | T08,T19 |
 | 06 Conversation | FR06 | BR05,BR10 | ticket_messages,activity_entries | Message/NoteController,message policies,ConversationService::addMessage | T06,T09,T13 |
@@ -18,12 +18,12 @@ Source references are section numbers in [02-initial-requirements.md](02-initial
 | 12 Search/filter | FR12 | BR01,BR02 | ticket scope/composite/FULLTEXT indexes | TicketVisibilityQuery,filters,list controller | T03,T20,T24 |
 | 13 CSV import | FR13 | BR02,BR03,BR12 | import_runs/import_rows,external references,receipts | Import controller,CSV reader,chunk jobs,TicketService::create | T16,T17,T19,T23 |
 | 14 Dashboard | FR14 | BR13 | tickets,cycle-resolution activity snapshots | TicketAnalyticsService, AnalyticsController, role-specific Tyro views | T03,T20,T24,T25 |
-| 15 Audit | FR15 | BR16 | activity_entries,receipts,bulk ledger | Business services,AuditController,public projection | T06,T15,T18,T19,T21 |
+| 15 Audit | FR15 | BR16 | activity_entries,receipts | Business services,AuditController,public projection | T06,T15,T18,T19,T21 |
 | 16 Database/performance | NFR01,NFR03,NFR05 | BR01,BR04,BR06,BR13 | FKs,uniques,checks,scoped indexes | Eloquent relations,query objects,bounded jobs | T08,T17,T19,T24 |
 | 17 Automated testing | NFR06 | All BR | Isolated MySQL and fast test fixtures | Pest unit/feature/integration lanes | T01–T25 |
 | Owner: record availability | FR16 | BR01,BR02 | is_active independent of workflow,actor fields | RecordLifecycleService::changeAvailability,policy/module controllers | T05,T07,T18,T22 |
 | Owner: module soft delete | FR16 | BR01,BR10,BR16 | deleted_at,retained FKs,protected ledger exceptions | RecordLifecycleService::archive,RecordLifecycleService::restore,archive views | T05,T13,T18,T21 |
-| Owner: bulk actions | FR17 | BR01,BR11 | bulk operations/items,receipts,activity | Concrete bulk controller,same single-record service methods | T15,T18,T19,T22 |
+| Owner: bulk actions | FR17 | BR01,BR11 | Mutated records,record-level receipts and activity; per-item results returned in response only | Concrete bulk controller,same single-record service methods | T15,T18,T19,T22 |
 | Owner: analytical dashboards | FR14 | BR13 | Historical snapshots and scoped aggregates | Admin/agent/customer analytics views/drilldowns | T20,T24,T25 |
 | Owner: Spatie data access | FR03 | BR01 | Prefixed access tables,user authorization_version | Permission resolver,policies,scoped queries,adapter | T03–T05,T21,T22 |
 | Owner: service pattern | NFR05,D13,ADR06 | BR01–BR16 | Existing transaction/constraint/receipt design unchanged | app/Services domain services; thin controllers/jobs; shared import/bulk methods | T01,T03,T07–T12,T15,T17,T19,T22 |

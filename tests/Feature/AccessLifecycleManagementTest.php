@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\BulkOperation;
 use App\Models\Role;
 use App\Models\Ticket;
 use App\Models\User;
@@ -9,8 +8,6 @@ use App\Services\BulkOperations\BulkOperationService;
 use Database\Seeders\AuthorizationPermissionSeeder;
 use Database\Seeders\TicketingConfigurationSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 beforeEach(function (): void {
     $this->seed([TicketingConfigurationSeeder::class, AuthorizationPermissionSeeder::class]);
@@ -28,22 +25,19 @@ it('provides app-owned user and role lifecycle pages to administrators only', fu
     $this->get(route('dashboard.access.roles'))->assertRedirect();
 });
 
-it('archives and restores accounts through an idempotent bounded bulk ledger', function (): void {
+it('archives and restores accounts through bounded bulk actions', function (): void {
     $customer = User::factory()->create();
     $customer->assignRole(Role::query()->where('name', 'customer')->firstOrFail());
-    $operationKey = (string) Str::uuid();
-    $payload = ['operation_key' => $operationKey, 'action' => 'archive', 'selected_ids' => [$customer->id]];
+    $payload = ['action' => 'archive', 'selected_ids' => [$customer->id]];
 
     $this->actingAs($this->admin)->post(route('dashboard.access.users.bulk'), $payload)->assertRedirect();
     $this->post(route('dashboard.access.users.bulk'), $payload)->assertRedirect();
     $archived = User::withTrashed()->findOrFail($customer->id);
     expect($archived->trashed())->toBeTrue()
         ->and($archived->is_active)->toBeFalse()
-        ->and($archived->tyroRoleSlugs())->toBe([])
-        ->and(BulkOperation::query()->where('operation_key', $operationKey)->value('succeeded_count'))->toBe(1);
+        ->and($archived->tyroRoleSlugs())->toBe([]);
 
     $this->post(route('dashboard.access.users.bulk'), [
-        'operation_key' => (string) Str::uuid(),
         'action' => 'restore',
         'selected_ids' => [$customer->id],
     ])->assertRedirect();
@@ -56,14 +50,12 @@ it('disables and restores custom roles while protecting system roles', function 
     $customer->assignRole($customRole);
 
     $this->actingAs($this->admin)->post(route('dashboard.access.roles.bulk'), [
-        'operation_key' => (string) Str::uuid(),
         'action' => 'disable',
         'selected_ids' => [$customRole->id],
     ])->assertRedirect();
     expect($customRole->fresh()->is_active)->toBeFalse()->and($customer->fresh()->tyroRoleSlugs())->toBe([]);
 
     $this->post(route('dashboard.access.roles.bulk'), [
-        'operation_key' => (string) Str::uuid(),
         'action' => 'archive',
         'selected_ids' => [$customRole->id],
     ])->assertRedirect();
@@ -71,7 +63,6 @@ it('disables and restores custom roles while protecting system roles', function 
     expect($archivedRole->trashed())->toBeTrue();
 
     $this->post(route('dashboard.access.roles.bulk'), [
-        'operation_key' => (string) Str::uuid(),
         'action' => 'restore',
         'selected_ids' => [$customRole->id],
     ])->assertRedirect();
@@ -79,7 +70,6 @@ it('disables and restores custom roles while protecting system roles', function 
 
     $adminRole = Role::query()->where('name', 'admin')->firstOrFail();
     $this->post(route('dashboard.access.roles.bulk'), [
-        'operation_key' => (string) Str::uuid(),
         'action' => 'disable',
         'selected_ids' => [$adminRole->id],
     ])->assertRedirect()->assertSessionHas('bulk_failures');
@@ -91,16 +81,11 @@ it('stops remaining bulk items when the actor is disabled between item transacti
     $secondAdministrator->assignRole(Role::query()->where('name', 'admin')->firstOrFail());
     $firstTicket = Ticket::factory()->create();
     $secondTicket = Ticket::factory()->create();
-    $operationKey = (string) Str::uuid();
     $actorWasDisabled = false;
 
     expect(fn () => app(BulkOperationService::class)->execute(
         $this->admin,
         'tickets.bulk',
-        'tickets',
-        Ticket::class,
-        'disable',
-        $operationKey,
         [$firstTicket->getKey(), $secondTicket->getKey()],
         function (int $ticketId) use (&$actorWasDisabled, $secondAdministrator): void {
             Ticket::query()->whereKey($ticketId)->update(['is_active' => false]);
@@ -114,7 +99,5 @@ it('stops remaining bulk items when the actor is disabled between item transacti
 
     expect($this->admin->fresh()->is_active)->toBeFalse()
         ->and($firstTicket->fresh()->is_active)->toBeFalse()
-        ->and($secondTicket->fresh()->is_active)->toBeTrue()
-        ->and(DB::table('bulk_operation_items')->where('subject_id', $firstTicket->getKey())->value('result'))->toBe('succeeded')
-        ->and(DB::table('bulk_operation_items')->where('subject_id', $secondTicket->getKey())->value('result'))->toBe('pending');
+        ->and($secondTicket->fresh()->is_active)->toBeTrue();
 });

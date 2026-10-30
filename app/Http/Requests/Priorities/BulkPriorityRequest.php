@@ -25,7 +25,6 @@ class BulkPriorityRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'operation_key' => ['required', 'uuid'],
             'action' => ['required', Rule::enum(PriorityBulkAction::class)],
             'selected_ids' => ['required', 'array', 'min:1', 'max:100'],
             'selected_ids.*' => ['required', 'integer', 'distinct', 'exists:priorities,id'],

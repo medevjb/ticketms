@@ -182,17 +182,13 @@ class PriorityService
     /** @param list<int> $priorityIds
      * @return array{succeeded: int, failed: list<array{id: int, message: string}>}
      */
-    public function bulk(User $actor, PriorityBulkAction $action, array $priorityIds, string $operationKey): array
+    public function bulk(User $actor, PriorityBulkAction $action, array $priorityIds): array
     {
         $this->authorizeManagement($actor);
 
         return $this->bulkOperations->execute(
             $actor,
             'priorities.manage',
-            'priorities',
-            Priority::class,
-            $action->value,
-            $operationKey,
             $priorityIds,
             function (int $priorityId) use ($action, $actor): void {
                 $priority = Priority::withTrashed()->findOrFail($priorityId);

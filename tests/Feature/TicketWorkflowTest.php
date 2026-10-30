@@ -365,7 +365,7 @@ it('records status mutations and messages atomically with idempotency receipts',
         ->and(DB::table('command_receipts')->where('operation_key', $operationKey)->whereNotNull('completed_at')->exists())->toBeTrue();
 });
 
-it('applies ticket bulk availability with version checks and an idempotent ledger', function (): void {
+it('applies ticket bulk availability with per-record version checks', function (): void {
     $ticket = ticketForWorkflow($this->customer);
     $operationKey = (string) Str::uuid();
     $payload = [
@@ -380,9 +380,7 @@ it('applies ticket bulk availability with version checks and an idempotent ledge
     $this->post(route('dashboard.tickets.bulk'), $payload)->assertRedirect();
 
     expect($ticket->fresh()->is_active)->toBeFalse()
-        ->and($ticket->fresh()->lock_version)->toBe(2)
-        ->and(DB::table('bulk_operations')->where('operation_key', $operationKey)->value('succeeded_count'))->toBe(1)
-        ->and(DB::table('bulk_operations')->where('operation_key', $operationKey)->value('failed_count'))->toBe(0);
+        ->and($ticket->fresh()->lock_version)->toBe(2);
 });
 
 it('records stale ticket versions and rejects non-admin ticket bulk actions', function (): void {

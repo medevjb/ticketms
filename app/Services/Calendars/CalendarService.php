@@ -243,17 +243,13 @@ class CalendarService
     /** @param list<int> $calendarIds
      * @return array{succeeded: int, failed: list<array{id: int, message: string}>}
      */
-    public function bulk(User $actor, CalendarBulkAction $action, array $calendarIds, string $operationKey): array
+    public function bulk(User $actor, CalendarBulkAction $action, array $calendarIds): array
     {
         $this->authorizeManagement($actor);
 
         return $this->bulkOperations->execute(
             $actor,
             'calendars.manage',
-            'calendars',
-            CalendarVersion::class,
-            $action->value,
-            $operationKey,
             $calendarIds,
             function (int $calendarId) use ($action, $actor): void {
                 $calendar = CalendarVersion::withTrashed()->findOrFail($calendarId);

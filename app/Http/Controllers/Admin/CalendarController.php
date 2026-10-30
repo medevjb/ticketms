@@ -99,7 +99,6 @@ class CalendarController extends BaseController
             $request->user(),
             CalendarBulkAction::from($request->validated('action')),
             array_values(array_map('intval', $request->validated('selected_ids'))),
-            (string) $request->validated('operation_key'),
         );
         $redirect = back()->with('success', "Bulk action completed for {$result['succeeded']} calendar versions.");
         if ($result['failed'] !== []) {

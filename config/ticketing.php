@@ -43,4 +43,5 @@ return [
             'password' => env('TICKETING_CUSTOMER_PASSWORD'),
         ],
     ],
+    'agent_invitation_expire_minutes' => (int) env('TICKETING_AGENT_INVITATION_EXPIRE_MINUTES', 1440),
 ];

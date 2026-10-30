@@ -56,7 +56,7 @@ Roles are defaults, not scattered controller checks. Permissions enable actions;
 | FR14 | Analytics | Admin sees organizational backlog, workload, throughput and SLA performance with definitions/date filters; agents see their work and permitted queue counts; customers see their own metrics; all drilldowns preserve scope. |
 | FR15 | Audit | Committed ticket changes record actor, time, action, safe before/after values and correlation; bulk/import/admin actions traceable; no ordinary user can rewrite or delete audit entries. |
 | FR16 | Record lifecycle | Each managed module has availability and archive/restore controls where applicable; tickets separate `is_active` from workflow `status`; archived records excluded from normal UI; protected/system records have documented exceptions. |
-| FR17 | Bulk actions | Every managed list supports applicable multi-record actions; selected IDs only, max 100 synchronously; validate/authorize each item, preview/confirm, report per-item success/conflict/failure; audit each mutation and operation. |
+| FR17 | Bulk actions | Every managed list supports applicable multi-record actions; selected IDs only, max 100 synchronously; validate/authorize each item, preview/confirm, report per-item success/conflict/failure in the response; audit each successful record mutation. Do not persist batch runs or per-item batch results. |
 | FR18 | SLA configuration | Admin publishes priority targets/threshold/calendar as immutable policy versions; creation uses current version atomically; disabled priority/category cannot be newly selected but historical links remain readable. |
 
 ## Workflow and user experience
