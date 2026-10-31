@@ -16,7 +16,9 @@ class AnalyticsController extends BaseController
         $filters = $request->validated();
 
         $data = $analytics->dashboard($request->user(), $filters['from'] ?? null, $filters['to'] ?? null);
-        $activeDays = collect($data['daily'])
+        /** @var list<array{date: string, created: int, resolved: int, closed: int}> $dailyData */
+        $dailyData = $data['daily'];
+        $activeDays = collect($dailyData)
             ->filter(fn (array $day): bool => $day['created'] + $day['resolved'] + $day['closed'] > 0);
         $order = $filters['activity_order'] ?? 'desc';
         $activeDays = ($order === 'asc' ? $activeDays->sortBy('date') : $activeDays->sortByDesc('date'))->values();

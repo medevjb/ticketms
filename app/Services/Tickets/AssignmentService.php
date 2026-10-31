@@ -139,7 +139,7 @@ class AssignmentService
             // Step 7: assign, advance the fairness timestamp, and record the outcome in the same transaction.
             $this->writeAssignment($lockedTicket, $agent, null);
             $profiles->forceFill(['last_auto_assigned_at' => CarbonImmutable::now('UTC')])->save();
-            $activity = $this->activity->record($lockedTicket,null,ActorKind::System,'ticket.auto_assigned',$operationKey,['assigned_agent_id' => ['before' => null, 'after' => $agent->getKey()], 'workload_before' => (int) ($workloads[(int) $agent->getKey()] ?? 0)]);
+            $activity = $this->activity->record($lockedTicket, null, ActorKind::System, 'ticket.auto_assigned', $operationKey, ['assigned_agent_id' => ['before' => null, 'after' => $agent->getKey()], 'workload_before' => (int) ($workloads[(int) $agent->getKey()] ?? 0)]);
             $this->activity->queueDeliveryIntents(
                 $activity,
                 $lockedTicket,
