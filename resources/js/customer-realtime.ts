@@ -30,14 +30,19 @@ type TicketRealtimeUpdate = {
 
 const userId = document.body.dataset.realtimeUserId;
 if (userId) {
-    echo.private(`user.${userId}`).listen('.ticket.updated', (update: TicketRealtimeUpdate) => {
-        applyUpdate(update);
-    });
+    echo.private(`user.${userId}`).listen(
+        '.ticket.updated',
+        (update: TicketRealtimeUpdate) => {
+            applyUpdate(update);
+        },
+    );
 }
 
 function applyUpdate(update: TicketRealtimeUpdate): void {
     const ticketId = String(update.ticket.id);
-    const ticketView = document.querySelector<HTMLElement>('[data-customer-ticket-id]');
+    const ticketView = document.querySelector<HTMLElement>(
+        '[data-customer-ticket-id]',
+    );
     const viewingThisTicket = ticketView?.dataset.customerTicketId === ticketId;
 
     if (viewingThisTicket && ticketView) {
@@ -46,17 +51,26 @@ function applyUpdate(update: TicketRealtimeUpdate): void {
         if (update.message) {
             appendMessage(ticketView, update.message);
         }
-        document.dispatchEvent(new CustomEvent('customer:ticket-updated', { detail: update.ticket }));
+        document.dispatchEvent(
+            new CustomEvent('customer:ticket-updated', {
+                detail: update.ticket,
+            }),
+        );
         if (previousStatus && previousStatus !== update.ticket.status) {
             window.location.reload();
             return;
         }
     }
 
-    const row = document.querySelector<HTMLElement>(`[data-ticket-row="${ticketId}"]`);
+    const row = document.querySelector<HTMLElement>(
+        `[data-ticket-row="${ticketId}"]`,
+    );
     if (row) {
         updateTicketRow(row, update.ticket);
-    } else if (update.action === 'ticket.created' && document.querySelector('[data-ticket-list]')) {
+    } else if (
+        update.action === 'ticket.created' &&
+        document.querySelector('[data-ticket-list]')
+    ) {
         window.location.reload();
         return;
     }
@@ -64,30 +78,44 @@ function applyUpdate(update: TicketRealtimeUpdate): void {
     announceUpdate(`${update.ticket.number} was updated.`);
 }
 
-function updateTicketDetails(container: HTMLElement, ticket: TicketRealtimeUpdate['ticket']): void {
+function updateTicketDetails(
+    container: HTMLElement,
+    ticket: TicketRealtimeUpdate['ticket'],
+): void {
     container.dataset.ticketStatus = ticket.status;
-    container.querySelectorAll<HTMLElement>('.customer-badge').forEach((badge) => {
-        if (badge.classList.contains('customer-badge-open')
-            || badge.classList.contains('customer-badge-in_progress')
-            || badge.classList.contains('customer-badge-waiting_customer')
-            || badge.classList.contains('customer-badge-resolved')
-            || badge.classList.contains('customer-badge-closed')) {
-            badge.className = `customer-badge customer-badge-${ticket.status}`;
-            badge.textContent = statusLabel(ticket.status);
-        }
-    });
+    container
+        .querySelectorAll<HTMLElement>('.customer-badge')
+        .forEach((badge) => {
+            if (
+                badge.classList.contains('customer-badge-open') ||
+                badge.classList.contains('customer-badge-in_progress') ||
+                badge.classList.contains('customer-badge-waiting_customer') ||
+                badge.classList.contains('customer-badge-resolved') ||
+                badge.classList.contains('customer-badge-closed')
+            ) {
+                badge.className = `customer-badge customer-badge-${ticket.status}`;
+                badge.textContent = statusLabel(ticket.status);
+            }
+        });
 
-    container.querySelectorAll<HTMLInputElement>('input[name="lock_version"]').forEach((input) => {
-        input.value = String(ticket.lock_version);
-    });
+    container
+        .querySelectorAll<HTMLInputElement>('input[name="lock_version"]')
+        .forEach((input) => {
+            input.value = String(ticket.lock_version);
+        });
 
-    const priority = container.querySelector<HTMLElement>('[data-ticket-priority]');
+    const priority = container.querySelector<HTMLElement>(
+        '[data-ticket-priority]',
+    );
     if (priority && ticket.priority) {
         priority.textContent = ticket.priority;
     }
 }
 
-function updateTicketRow(row: HTMLElement, ticket: TicketRealtimeUpdate['ticket']): void {
+function updateTicketRow(
+    row: HTMLElement,
+    ticket: TicketRealtimeUpdate['ticket'],
+): void {
     const status = row.querySelector<HTMLElement>('[data-ticket-status-badge]');
     if (status) {
         status.className = `customer-badge customer-badge-${ticket.status}`;
@@ -99,7 +127,9 @@ function updateTicketRow(row: HTMLElement, ticket: TicketRealtimeUpdate['ticket'
         priority.textContent = ticket.priority;
     }
 
-    const updatedAt = row.querySelector<HTMLElement>('[data-ticket-updated-at]');
+    const updatedAt = row.querySelector<HTMLElement>(
+        '[data-ticket-updated-at]',
+    );
     if (updatedAt && ticket.updated_at) {
         updatedAt.textContent = new Intl.DateTimeFormat(undefined, {
             dateStyle: 'medium',
@@ -113,12 +143,18 @@ function appendMessage(
     ticketView: HTMLElement,
     message: NonNullable<TicketRealtimeUpdate['message']>,
 ): void {
-    const conversation = ticketView.querySelector<HTMLElement>('.customer-conversation-body');
-    if (!conversation || conversation.querySelector(`[data-message-id="${message.id}"]`)) {
+    const conversation = ticketView.querySelector<HTMLElement>(
+        '.customer-conversation-body',
+    );
+    if (
+        !conversation ||
+        conversation.querySelector(`[data-message-id="${message.id}"]`)
+    ) {
         return;
     }
 
-    const isCustomerMessage = message.author_id === Number(ticketView.dataset.customerId);
+    const isCustomerMessage =
+        message.author_id === Number(ticketView.dataset.customerId);
     const article = document.createElement('article');
     article.className = `customer-chat-message ${isCustomerMessage ? 'customer-chat-message-self' : 'customer-chat-message-support'}`;
     article.dataset.messageId = String(message.id);
@@ -164,9 +200,12 @@ function appendMessage(
     conversation.append(article);
     conversation.scrollTop = conversation.scrollHeight;
 
-    const count = ticketView.querySelector<HTMLElement>('.customer-conversation-count');
+    const count = ticketView.querySelector<HTMLElement>(
+        '.customer-conversation-count',
+    );
     if (count) {
-        const messageCount = conversation.querySelectorAll('[data-message-id]').length;
+        const messageCount =
+            conversation.querySelectorAll('[data-message-id]').length;
         count.textContent = `${messageCount} ${messageCount === 1 ? 'message' : 'messages'}`;
     }
 }
@@ -204,17 +243,23 @@ function createAttachment(attachment: RealtimeAttachment): HTMLElement {
 }
 
 function statusLabel(status: string): string {
-    return ({
-        open: 'Open',
-        in_progress: 'In progress',
-        waiting_customer: 'Waiting for you',
-        resolved: 'Resolved',
-        closed: 'Closed',
-    } as Record<string, string>)[status] ?? status;
+    return (
+        (
+            {
+                open: 'Open',
+                in_progress: 'In progress',
+                waiting_customer: 'Waiting for you',
+                resolved: 'Resolved',
+                closed: 'Closed',
+            } as Record<string, string>
+        )[status] ?? status
+    );
 }
 
 function announceUpdate(message: string): void {
-    const announcement = document.querySelector<HTMLElement>('[data-live-announcement]');
+    const announcement = document.querySelector<HTMLElement>(
+        '[data-live-announcement]',
+    );
     if (!announcement) {
         return;
     }

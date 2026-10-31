@@ -10,7 +10,18 @@ import { defineConfig, lazyPlugins } from 'vite-plus';
 export default defineConfig({
     plugins: lazyPlugins(() => [
         laravel({
-            input: ['resources/css/app.css', 'resources/css/customer-portal.css', 'resources/js/app.tsx', 'resources/js/ticket-operations.ts', 'resources/js/ticket-table.ts', 'resources/js/customer-sla-preview.ts', 'resources/js/category-editor.ts', 'resources/js/confirm-actions.ts', 'resources/js/customer-realtime.ts', 'resources/css/ticket-table.css'],
+            input: [
+                'resources/css/app.css',
+                'resources/css/customer-portal.css',
+                'resources/js/app.tsx',
+                'resources/js/ticket-operations.ts',
+                'resources/js/ticket-table.ts',
+                'resources/js/customer-sla-preview.ts',
+                'resources/js/category-editor.ts',
+                'resources/js/confirm-actions.ts',
+                'resources/js/customer-realtime.ts',
+                'resources/css/ticket-table.css',
+            ],
             detectTls: 'ticketms.test',
             refresh: true,
             fonts: [

@@ -6,6 +6,8 @@ use App\Enums\ActorKind;
 use App\Enums\MessageVisibility;
 use App\Models\ActivityEntry;
 use App\Models\BusinessCalendar;
+use App\Models\CalendarHoliday;
+use App\Models\CalendarWindow;
 use App\Models\User;
 use App\Services\Authorization\EffectivePermissionService;
 use Carbon\CarbonImmutable;
@@ -42,13 +44,13 @@ class CalendarService
             $before = [
                 'name' => $calendar->name,
                 'timezone' => $calendar->timezone,
-                'windows' => $calendar->windows->map(fn ($window): array => [
+                'windows' => $calendar->windows->map(fn (CalendarWindow $window): array => [
                     'weekday' => (int) $window->weekday,
                     'opens_at' => (string) $window->opens_at,
                     'closes_at' => (string) $window->closes_at,
                 ])->all(),
-                'holidays' => $calendar->holidays->map(fn ($holiday): array => [
-                    'holiday_date' => $holiday->holiday_date?->format('Y-m-d'),
+                'holidays' => $calendar->holidays->map(fn (CalendarHoliday $holiday): array => [
+                    'holiday_date' => CarbonImmutable::parse($holiday->getRawOriginal('holiday_date'))->format('Y-m-d'),
                     'name' => $holiday->name,
                 ])->all(),
             ];

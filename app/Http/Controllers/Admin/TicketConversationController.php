@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\MessageVisibility;
+use App\Enums\TicketStatus;
 use App\Http\Requests\Tickets\ModerateMessageRequest;
 use App\Http\Requests\Tickets\StoreMessageRequest;
 use App\Services\Tickets\AttachmentService;
@@ -37,14 +38,14 @@ class TicketConversationController extends BaseController
                 'message' => 'Your message was added.',
                 'ticket' => [
                     'lock_version' => $message->ticket->lock_version,
-                    'status' => $message->ticket->status->value,
+                    'status' => TicketStatus::from($message->ticket->getRawOriginal('status'))->value,
                 ],
                 'record' => [
                     'id' => $message->getKey(),
                     'body' => $message->body,
-                    'visibility' => $message->visibility->value,
+                    'visibility' => MessageVisibility::from($message->getRawOriginal('visibility'))->value,
                     'author_id' => $message->author_id,
-                    'author' => $message->author?->name ?? 'Former user',
+                    'author' => $message->author->name,
                     'created_at' => $message->created_at?->timezone(config('ticketing.display_timezone', 'Asia/Dhaka'))->format('d M Y, h:i A'),
                     'updated_at' => $message->updated_at?->toIso8601String(),
                     'is_active' => $message->is_active,

@@ -24,6 +24,7 @@ class AgentManagementService
         private readonly UserLifecycleService $userLifecycle,
     ) {}
 
+    /** @return LengthAwarePaginator<int, User> */
     public function list(User $actor, string $search = ''): LengthAwarePaginator
     {
         $this->authorizeManagement($actor);

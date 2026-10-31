@@ -22,7 +22,10 @@ type MessageRecord = {
     attachments: AttachmentRecord[];
 };
 
-type ModerationRecord = Pick<MessageRecord, 'id' | 'is_active' | 'updated_at'> & {
+type ModerationRecord = Pick<
+    MessageRecord,
+    'id' | 'is_active' | 'updated_at'
+> & {
     action: string;
     archived: boolean;
 };
@@ -48,14 +51,18 @@ declare global {
     }
 }
 
-const csrfToken = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+const csrfToken =
+    document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
+        ?.content ?? '';
 
 document.querySelectorAll<HTMLFormElement>('form').forEach((form) => {
     const action = new URL(form.action, window.location.href).pathname;
 
     if (form.matches('.customer-form') && action.endsWith('/messages')) {
         form.dataset.axiosForm = 'reply';
-        form.querySelector<HTMLInputElement>('.customer-chat-file-input')?.addEventListener('change', () => {
+        form.querySelector<HTMLInputElement>(
+            '.customer-chat-file-input',
+        )?.addEventListener('change', () => {
             updateAttachmentStatus(form);
         });
     } else if (action.endsWith('/priority')) {
@@ -76,21 +83,30 @@ document.addEventListener('submit', async (event) => {
     event.preventDefault();
     clearErrors(form);
 
-    const submitButton = event.submitter instanceof HTMLButtonElement ? event.submitter : form.querySelector<HTMLButtonElement>('button[type="submit"]');
-    const originalButtonNodes = submitButton ? Array.from(submitButton.childNodes, (node) => node.cloneNode(true)) : [];
+    const submitButton =
+        event.submitter instanceof HTMLButtonElement
+            ? event.submitter
+            : form.querySelector<HTMLButtonElement>('button[type="submit"]');
+    const originalButtonNodes = submitButton
+        ? Array.from(submitButton.childNodes, (node) => node.cloneNode(true))
+        : [];
     if (submitButton) {
         submitButton.disabled = true;
         submitButton.textContent = 'Saving…';
     }
 
     try {
-        const response = await axios.post<AjaxResponse>(form.action, new FormData(form), {
-            headers: {
-                Accept: 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRF-TOKEN': csrfToken,
+        const response = await axios.post<AjaxResponse>(
+            form.action,
+            new FormData(form),
+            {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
             },
-        });
+        );
 
         const payload = response.data;
         if (payload.ticket?.lock_version) {
@@ -99,7 +115,11 @@ document.addEventListener('submit', async (event) => {
 
         switch (form.dataset.axiosForm) {
             case 'reply':
-                if (payload.record && 'body' in payload.record && payload.ticket) {
+                if (
+                    payload.record &&
+                    'body' in payload.record &&
+                    payload.ticket
+                ) {
                     const previousStatus = ticketRoot()?.dataset.ticketStatus;
                     appendMessage(payload.record);
                     form.reset();
@@ -108,7 +128,11 @@ document.addEventListener('submit', async (event) => {
                     updateLockVersions(payload.ticket.lock_version);
                     toast(payload.message, 'success');
 
-                    if (previousStatus && payload.ticket.status && previousStatus !== payload.ticket.status) {
+                    if (
+                        previousStatus &&
+                        payload.ticket.status &&
+                        previousStatus !== payload.ticket.status
+                    ) {
                         window.setTimeout(() => window.location.reload(), 700);
                     }
                 }
@@ -118,7 +142,10 @@ document.addEventListener('submit', async (event) => {
                     updateModeratedMessage(form, payload.record);
                     rotateOperationKey(form);
                     toast(payload.message, 'success');
-                    if (payload.record.archived || payload.record.action === 'restore') {
+                    if (
+                        payload.record.archived ||
+                        payload.record.action === 'restore'
+                    ) {
                         window.setTimeout(() => window.location.reload(), 700);
                     }
                 }
@@ -137,7 +164,9 @@ document.addEventListener('submit', async (event) => {
                 }
                 break;
             case 'agent-eligibility': {
-                const enabledInput = form.querySelector<HTMLInputElement>('input[name="auto_assignment_enabled"]');
+                const enabledInput = form.querySelector<HTMLInputElement>(
+                    'input[name="auto_assignment_enabled"]',
+                );
                 if (enabledInput) {
                     enabledInput.value = enabledInput.value === '1' ? '0' : '1';
                     rotateOperationKey(form);
@@ -147,16 +176,33 @@ document.addEventListener('submit', async (event) => {
             }
         }
     } catch (error: unknown) {
-        const response = axios.isAxiosError<{ errors?: Record<string, string[]> }>(error) ? error.response : undefined;
+        const response = axios.isAxiosError<{
+            errors?: Record<string, string[]>;
+        }>(error)
+            ? error.response
+            : undefined;
         if (response?.status === 422 && response.data.errors) {
             showErrors(form, response.data.errors);
-            toast([...new Set(Object.values(response.data.errors).flat())].join(' '), 'error');
+            toast(
+                [...new Set(Object.values(response.data.errors).flat())].join(
+                    ' ',
+                ),
+                'error',
+            );
         } else if (response?.status === 409) {
-            toast(form.dataset.axiosForm === 'agent-eligibility' ? 'Agent eligibility changed. Reload the page and try again.' : 'This ticket changed while you were working. Reload the page and try again.', 'error');
+            toast(
+                form.dataset.axiosForm === 'agent-eligibility'
+                    ? 'Agent eligibility changed. Reload the page and try again.'
+                    : 'This ticket changed while you were working. Reload the page and try again.',
+                'error',
+            );
         } else if (response?.status === 403) {
             toast('You are not allowed to perform this action.', 'error');
         } else {
-            toast('The operation could not be completed. Please try again.', 'error');
+            toast(
+                'The operation could not be completed. Please try again.',
+                'error',
+            );
         }
     } finally {
         if (submitButton) {
@@ -170,9 +216,14 @@ document.addEventListener('submit', async (event) => {
 });
 
 function syncAgentEligibilitySwitch(form: HTMLFormElement): void {
-    const enabledInput = form.querySelector<HTMLInputElement>('input[name="auto_assignment_enabled"]');
-    const switchButton = form.querySelector<HTMLButtonElement>('[role="switch"]');
-    const label = form.querySelector<HTMLElement>('.agent-assignment-switch-label');
+    const enabledInput = form.querySelector<HTMLInputElement>(
+        'input[name="auto_assignment_enabled"]',
+    );
+    const switchButton =
+        form.querySelector<HTMLButtonElement>('[role="switch"]');
+    const label = form.querySelector<HTMLElement>(
+        '.agent-assignment-switch-label',
+    );
     if (!enabledInput || !switchButton || !label) {
         return;
     }
@@ -188,25 +239,34 @@ function ticketRoot(): HTMLElement | null {
 }
 
 function updateLockVersions(version: number): void {
-    document.querySelectorAll<HTMLInputElement>('input[name="lock_version"]').forEach((input) => {
-        input.value = String(version);
-    });
+    document
+        .querySelectorAll<HTMLInputElement>('input[name="lock_version"]')
+        .forEach((input) => {
+            input.value = String(version);
+        });
 }
 
 function rotateOperationKey(form: HTMLFormElement): void {
-    const input = form.querySelector<HTMLInputElement>('input[name="operation_key"]');
+    const input = form.querySelector<HTMLInputElement>(
+        'input[name="operation_key"]',
+    );
     if (input && 'randomUUID' in crypto) {
         input.value = crypto.randomUUID();
     }
 }
 
 function toast(message: string, type: 'success' | 'error'): void {
-    if (typeof window.showToast === 'function' && document.getElementById('toast-container')) {
+    if (
+        typeof window.showToast === 'function' &&
+        document.getElementById('toast-container')
+    ) {
         window.showToast(message, type);
         return;
     }
 
-    const main = document.querySelector<HTMLElement>('.customer-main, .page-content');
+    const main = document.querySelector<HTMLElement>(
+        '.customer-main, .page-content',
+    );
     if (!main) {
         return;
     }
@@ -221,22 +281,41 @@ function toast(message: string, type: 'success' | 'error'): void {
 }
 
 function clearErrors(form: HTMLFormElement): void {
-    form.querySelectorAll('[data-axios-error]').forEach((error) => error.remove());
+    form.querySelectorAll('[data-axios-error]').forEach((error) =>
+        error.remove(),
+    );
     form.querySelectorAll('.is-invalid').forEach((field) => {
         field.classList.remove('is-invalid');
         field.removeAttribute('aria-invalid');
     });
 }
 
-function showErrors(form: HTMLFormElement, errors: Record<string, string[]>): void {
+function showErrors(
+    form: HTMLFormElement,
+    errors: Record<string, string[]>,
+): void {
     Object.keys(errors).forEach((name) => {
         const field = Array.from(form.elements).find((element) => {
-            if (!(element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement)) {
+            if (
+                !(
+                    element instanceof HTMLInputElement ||
+                    element instanceof HTMLSelectElement ||
+                    element instanceof HTMLTextAreaElement
+                )
+            ) {
                 return false;
             }
 
-            return element.name === name || (name.startsWith('attachments.') && element.name === 'attachments[]');
-        }) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | undefined;
+            return (
+                element.name === name ||
+                (name.startsWith('attachments.') &&
+                    element.name === 'attachments[]')
+            );
+        }) as
+            | HTMLInputElement
+            | HTMLSelectElement
+            | HTMLTextAreaElement
+            | undefined;
 
         if (!field) {
             return;
@@ -248,8 +327,12 @@ function showErrors(form: HTMLFormElement, errors: Record<string, string[]>): vo
 }
 
 function appendMessage(message: MessageRecord): void {
-    const adminThread = document.querySelector<HTMLElement>('.ticket-conversation-body');
-    const customerThread = document.querySelector<HTMLElement>('.customer-conversation-body');
+    const adminThread = document.querySelector<HTMLElement>(
+        '.ticket-conversation-body',
+    );
+    const customerThread = document.querySelector<HTMLElement>(
+        '.customer-conversation-body',
+    );
     if (adminThread) {
         appendAdminMessage(adminThread, message);
         updateMessageCount('.ticket-message-count', adminThread);
@@ -306,8 +389,12 @@ function appendAdminMessage(thread: HTMLElement, message: MessageRecord): void {
     article.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-function appendCustomerMessage(thread: HTMLElement, message: MessageRecord): void {
-    const isOwn = String(message.author_id) === ticketRoot()?.dataset.currentUserId;
+function appendCustomerMessage(
+    thread: HTMLElement,
+    message: MessageRecord,
+): void {
+    const isOwn =
+        String(message.author_id) === ticketRoot()?.dataset.currentUserId;
     const article = document.createElement('article');
     article.className = `customer-chat-message ${isOwn ? 'customer-chat-message-self' : 'customer-chat-message-support'}`;
     article.dataset.messageId = String(message.id);
@@ -344,7 +431,11 @@ function appendCustomerMessage(thread: HTMLElement, message: MessageRecord): voi
     article.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-function appendAttachments(container: HTMLElement, attachments: AttachmentRecord[], className = 'ticket-message-attachment'): void {
+function appendAttachments(
+    container: HTMLElement,
+    attachments: AttachmentRecord[],
+    className = 'ticket-message-attachment',
+): void {
     attachments.forEach((attachment) => {
         if (attachment.preview_url) {
             const preview = document.createElement('a');
@@ -379,7 +470,8 @@ function appendAttachments(container: HTMLElement, attachments: AttachmentRecord
             download.href = attachment.url;
             download.title = `Download ${attachment.name}`;
             download.setAttribute('aria-label', download.title);
-            download.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/></svg>';
+            download.innerHTML =
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/></svg>';
             footer.append(meta, download);
             card.append(preview, footer);
             container.append(card);
@@ -444,34 +536,59 @@ function createModerationForm(message: MessageRecord): HTMLFormElement {
     return form;
 }
 
-function addOption(select: HTMLSelectElement, value: string, label: string): void {
+function addOption(
+    select: HTMLSelectElement,
+    value: string,
+    label: string,
+): void {
     const option = document.createElement('option');
     option.value = value;
     option.textContent = label;
     select.append(option);
 }
 
-function updateModeratedMessage(form: HTMLFormElement, record: ModerationRecord): void {
-    const article = form.closest<HTMLElement>('[data-message-id]')
-        ?? Array.from(document.querySelectorAll<HTMLElement>('[data-message-id]')).find((row) => row.dataset.messageId === String(record.id));
-    const select = form.querySelector<HTMLSelectElement>('select[name="action"]');
+function updateModeratedMessage(
+    form: HTMLFormElement,
+    record: ModerationRecord,
+): void {
+    const article =
+        form.closest<HTMLElement>('[data-message-id]') ??
+        Array.from(
+            document.querySelectorAll<HTMLElement>('[data-message-id]'),
+        ).find((row) => row.dataset.messageId === String(record.id));
+    const select = form.querySelector<HTMLSelectElement>(
+        'select[name="action"]',
+    );
     const reason = form.querySelector<HTMLInputElement>('input[name="reason"]');
-    const expected = form.querySelector<HTMLInputElement>('input[name="expected_updated_at"]');
+    const expected = form.querySelector<HTMLInputElement>(
+        'input[name="expected_updated_at"]',
+    );
     if (!article || !select || !expected) {
         return;
     }
 
     const action = record.action;
-    const tags = article.querySelector('.ticket-message-tags, .ticket-internal-note-meta');
+    const tags = article.querySelector(
+        '.ticket-message-tags, .ticket-internal-note-meta',
+    );
     tags?.querySelector('.ticket-message-tag-muted')?.remove();
     if (record.archived || action === 'archive') {
         appendStateTag(tags, 'Archived');
         select.replaceChildren(new Option('Restore', 'restore'));
-    } else if (action === 'hide' || (action === 'restore' && !record.is_active)) {
+    } else if (
+        action === 'hide' ||
+        (action === 'restore' && !record.is_active)
+    ) {
         appendStateTag(tags, 'Hidden');
-        select.replaceChildren(new Option('Unhide', 'unhide'), new Option('Archive', 'archive'));
+        select.replaceChildren(
+            new Option('Unhide', 'unhide'),
+            new Option('Archive', 'archive'),
+        );
     } else {
-        select.replaceChildren(new Option('Hide from customer', 'hide'), new Option('Archive', 'archive'));
+        select.replaceChildren(
+            new Option('Hide from customer', 'hide'),
+            new Option('Archive', 'archive'),
+        );
     }
 
     expected.value = record.updated_at ?? '';
@@ -492,7 +609,9 @@ function appendStateTag(container: Element | null, label: string): void {
 
 function updateAssignment(ticket: TicketPayload): void {
     const root = ticketRoot();
-    const value = root?.querySelector<HTMLElement>('.ticket-detail-facts .ticket-fact:nth-child(3) .ticket-fact-value');
+    const value = root?.querySelector<HTMLElement>(
+        '.ticket-detail-facts .ticket-fact:nth-child(3) .ticket-fact-value',
+    );
     if (value) {
         value.textContent = ticket.assigned_agent ?? 'Unassigned';
     }
@@ -507,12 +626,17 @@ function updateMessageCount(selector: string, thread: HTMLElement): void {
 }
 
 function updateAttachmentStatus(form: HTMLFormElement): void {
-    const fileInput = form.querySelector<HTMLInputElement>('.customer-chat-file-input');
+    const fileInput = form.querySelector<HTMLInputElement>(
+        '.customer-chat-file-input',
+    );
     const status = form.querySelector<HTMLElement>('[data-chat-file-status]');
     if (!fileInput || !status) {
         return;
     }
 
     const count = fileInput.files?.length ?? 0;
-    status.textContent = count === 0 ? 'No files' : `${count} ${count === 1 ? 'file' : 'files'} selected`;
+    status.textContent =
+        count === 0
+            ? 'No files'
+            : `${count} ${count === 1 ? 'file' : 'files'} selected`;
 }

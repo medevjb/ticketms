@@ -3,6 +3,7 @@
 namespace App\Http\Requests\SlaPolicies;
 
 use App\Models\Priority;
+use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -34,6 +35,7 @@ class UpdateSlaPolicyRequest extends FormRequest
         ];
     }
 
+    /** @return list<Closure(Validator): void> */
     public function after(): array
     {
         return [function (Validator $validator): void {

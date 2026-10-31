@@ -48,8 +48,8 @@ class TicketRealtimeService
             (int) data_get($activity->changes, 'assigned_agent_id.before', 0),
             (int) data_get($activity->changes, 'assigned_agent_id.after', 0),
         ];
-        $recipients = User::query()->active()->whereIn('id', array_filter(array_unique($recipientIds)))->pluck('id')
-            ->map(static fn (mixed $id): int => (int) $id)->all();
+        $recipients = array_values(User::query()->active()->whereIn('id', array_filter(array_unique($recipientIds)))->pluck('id')
+            ->map(static fn (mixed $id): int => (int) $id)->all());
 
         TicketRealtimeUpdated::dispatch(
             (int) $ticket->getKey(),
@@ -71,7 +71,7 @@ class TicketRealtimeService
                     'id' => (int) $message->getKey(),
                     'body' => $message->body,
                     'author_id' => (int) $message->author_id,
-                    'author' => $message->author?->name ?? 'Support',
+                    'author' => $message->author->name,
                     'created_at' => $message->created_at?->toIso8601String(),
                     'attachments' => $message->attachments->map(static fn ($attachment): array => [
                         'id' => (int) $attachment->getKey(),
