@@ -16,7 +16,7 @@ beforeEach(function (): void {
 });
 
 it('provides app-owned user and role lifecycle pages to administrators only', function (): void {
-    $this->actingAs($this->admin)->get(route('dashboard.access.users'))->assertOk()->assertSee('User access');
+    $this->actingAs($this->admin)->get(route('dashboard.access.users'))->assertRedirectToRoute('dashboard.users.index');
     $this->get(route('dashboard.access.roles'))->assertOk()->assertSee('Role access');
 
     $agent = User::factory()->create();

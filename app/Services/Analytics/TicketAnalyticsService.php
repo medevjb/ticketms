@@ -32,7 +32,7 @@ class TicketAnalyticsService
         [$fromDate, $toDate] = $this->dateRange($fromInput, $toInput);
         $key = implode(':', [
             'ticket-analytics',
-            'v1',
+            'v2',
             $role === 'admin' ? 'organization' : (string) $actor->getKey(),
             $role === 'admin' ? 'shared' : (string) $actor->authorization_version,
             hash('sha256', implode('|', $actor->tyroRoleSlugs())),
@@ -41,11 +41,16 @@ class TicketAnalyticsService
             $toDate->format('Y-m-d'),
         ]);
 
-        if ($role !== 'admin') {
-            return $this->buildDashboard($actor, $role, $fromDate, $toDate);
-        }
+        $dashboard = $role === 'admin'
+            ? Cache::remember($key, now()->addSeconds(60), fn (): array => $this->buildDashboard($actor, $role, $fromDate, $toDate))
+            : $this->buildDashboard($actor, $role, $fromDate, $toDate);
 
-        return Cache::remember($key, now()->addSeconds(60), fn (): array => $this->buildDashboard($actor, $role, $fromDate, $toDate));
+        $dashboard['recent_tickets'] = $this->ticketScope($actor, $role)
+            ->latest('created_at')->latest('id')->limit(10)->get([
+                'id', 'number', 'subject', 'status', 'is_active', 'created_at', 'sla_due_at', 'assigned_agent_id',
+            ]);
+
+        return $dashboard;
     }
 
     /** @return array<string, mixed> */
@@ -159,9 +164,6 @@ class TicketAnalyticsService
             'category_breakdown' => $role === 'admin' ? $this->currentBreakdown($backlog, 'categories') : [],
             'agent_workload' => $role === 'admin' ? $this->agentWorkload($activeStatuses) : [],
             'daily' => $daily,
-            'recent_tickets' => (clone $currentTickets)->latest('created_at')->latest('id')->limit(10)->get([
-                'id', 'number', 'subject', 'status', 'created_at', 'sla_due_at', 'assigned_agent_id',
-            ]),
         ];
     }
 

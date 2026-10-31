@@ -7,6 +7,7 @@ use App\Enums\MessageVisibility;
 use App\Enums\PriorityBulkAction;
 use App\Models\ActivityEntry;
 use App\Models\Priority;
+use App\Models\SlaPolicy;
 use App\Models\TicketingSetting;
 use App\Models\User;
 use App\Services\Authorization\EffectivePermissionService;
@@ -109,7 +110,7 @@ class PriorityService
         $this->authorizeManagement($actor);
 
         DB::transaction(function () use ($priority, $isActive, $actor): void {
-            $settings = $this->lockSettings();
+            $this->lockSettings();
             $this->lockAndAuthorizeActor($actor);
             $lockedPriorities = Priority::query()->active()->orderBy('id')->lockForUpdate()->get();
             $locked = $lockedPriorities->firstWhere('id', $priority->getKey());
@@ -123,12 +124,13 @@ class PriorityService
                 return;
             }
 
+            $policyId = SlaPolicy::query()->value('id');
             if ($isActive && ! DB::table('sla_policy_targets')
-                ->where('sla_policy_id', $settings->current_sla_policy_id)
+                ->where('sla_policy_id', $policyId)
                 ->where('priority_id', $locked->getKey())
                 ->exists()) {
                 throw ValidationException::withMessages([
-                    'priority' => 'Publish a current SLA policy target for this priority before enabling it.',
+                    'priority' => 'Set an SLA target for this priority before enabling it.',
                 ]);
             }
 

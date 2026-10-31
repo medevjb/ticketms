@@ -13,7 +13,6 @@ class TicketingSettingFactory extends Factory
     {
         return [
             'id' => 1,
-            'current_sla_policy_id' => null,
         ];
     }
 }

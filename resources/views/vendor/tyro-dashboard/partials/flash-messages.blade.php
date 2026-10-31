@@ -1,140 +1,44 @@
 @php
-    $notificationStyle = config('tyro-dashboard.notifications.notification_style', 'legacy');
     $toastPosition = config('tyro-dashboard.notifications.toast_position', 'bottom-right');
     $autoDismissSeconds = config('tyro-dashboard.notifications.auto_dismiss_seconds', 5);
+    $notifications = [];
+    foreach (['success', 'error', 'warning', 'info'] as $type) {
+        if (session($type)) {
+            $notifications[] = ['type' => $type, 'messages' => [session($type)]];
+        }
+    }
+    if ($errors->any()) {
+        $notifications[] = ['type' => 'error', 'messages' => array_values(array_unique($errors->all()))];
+    }
+    if (session('bulk_failures')) {
+        $notifications[] = [
+            'type' => 'warning',
+            'title' => 'Some selected records could not be updated.',
+            'messages' => array_map(fn ($failure) => 'Record #'.$failure['id'].': '.$failure['message'], session('bulk_failures')),
+        ];
+    }
 @endphp
-
-@if ($notificationStyle === 'toast')
-    <div id="toast-container" class="toast-container" data-position="{{ $toastPosition }}" data-auto-dismiss="{{ $autoDismissSeconds * 1000 }}">
-        
-        @if (session('success'))
-        <div class="toast toast-success">
-            <div class="toast-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-            </div>
-            <div class="toast-content">
-                <p class="toast-message">{{ session('success') }}</p>
-            </div>
+<div id="toast-container" class="toast-container" data-position="{{ $toastPosition }}" data-auto-dismiss="{{ $autoDismissSeconds * 1000 }}">
+    @foreach($notifications as $notification)
+    <div class="toast toast-{{ $notification['type'] }}" role="{{ $notification['type'] === 'error' ? 'alert' : 'status' }}" aria-live="{{ $notification['type'] === 'error' ? 'assertive' : 'polite' }}">
+        <div class="toast-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"/>
+                @if($notification['type'] === 'success')<path stroke-linecap="round" stroke-linejoin="round" d="m8 12 3 3 5-6"/>
+                @else<path stroke-linecap="round" d="M12 7v6m0 4h.01"/>@endif
+            </svg>
         </div>
-        @endif
-
-        @if (session('error'))
-        <div class="toast toast-error">
-            <div class="toast-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-            </div>
-            <div class="toast-content">
-                <p class="toast-message">{{ session('error') }}</p>
-            </div>
+        <div class="toast-content">
+            @isset($notification['title'])<p class="toast-title">{{ $notification['title'] }}</p>@endisset
+            @if(count($notification['messages']) === 1)
+                <p class="toast-message">{{ $notification['messages'][0] }}</p>
+            @else
+                <ul class="toast-error-list">@foreach($notification['messages'] as $message)<li>{{ $message }}</li>@endforeach</ul>
+            @endif
         </div>
-        @endif
-
-        @if (session('warning'))
-        <div class="toast toast-warning">
-            <div class="toast-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-            </div>
-            <div class="toast-content">
-                <p class="toast-message">{{ session('warning') }}</p>
-            </div>
-        </div>
-        @endif
-
-        @if (session('info'))
-        <div class="toast toast-info">
-            <div class="toast-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-            </div>
-            <div class="toast-content">
-                <p class="toast-message">{{ session('info') }}</p>
-            </div>
-        </div>
-        @endif
-
-        @if ($errors->any() && config('tyro-dashboard.resource_ui.show_global_errors', true))
-        <div class="toast toast-error">
-            <div class="toast-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-            </div>
-            <div class="toast-content">
-                <p class="toast-title">Please correct the following errors:</p>
-                <ul class="toast-error-list">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
-            </div>
-        </div>
-        @endif
+        <button class="toast-close" type="button" aria-label="Dismiss notification" onclick="dismissToast(this.closest('.toast'))">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" d="m6 6 12 12M6 18 18 6"/></svg>
+        </button>
     </div>
-@else
-    @if (session('success'))
-    <div class="alert alert-success">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <div class="alert-content">
-            <p class="alert-message">{{ session('success') }}</p>
-        </div>
-    </div>
-    @endif
-
-    @if (session('error'))
-    <div class="alert alert-error">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <div class="alert-content">
-            <p class="alert-message">{{ session('error') }}</p>
-        </div>
-    </div>
-    @endif
-
-    @if (session('warning'))
-    <div class="alert alert-warning">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-        </svg>
-        <div class="alert-content">
-            <p class="alert-message">{{ session('warning') }}</p>
-        </div>
-    </div>
-    @endif
-
-    @if (session('info'))
-    <div class="alert alert-info">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <div class="alert-content">
-            <p class="alert-message">{{ session('info') }}</p>
-        </div>
-    </div>
-    @endif
-
-    @if ($errors->any() && config('tyro-dashboard.resource_ui.show_global_errors', true))
-    <div class="alert alert-error">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <div class="alert-content">
-            <p class="alert-title">Please correct the following errors:</p>
-            <ul style="margin-top: 0.5rem; margin-left: 1rem; list-style: disc;">
-                @foreach ($errors->all() as $error)
-                    <li style="font-size: 0.875rem;">{{ $error }}</li>
-                @endforeach
-            </ul>
-        </div>
-    </div>
-    @endif
-@endif
+    @endforeach
+</div>

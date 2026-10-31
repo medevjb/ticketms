@@ -25,6 +25,9 @@ class AnalyticsFilterRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'activity_page' => ['nullable', 'integer', 'min:1'],
+            'activity_per_page' => ['nullable', 'integer', 'in:10,20,30'],
+            'activity_order' => ['nullable', 'in:asc,desc'],
             'from' => ['nullable', 'date_format:Y-m-d'],
             'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
         ];

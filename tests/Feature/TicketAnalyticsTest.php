@@ -153,7 +153,6 @@ it('records immutable SLA inputs in the resolution activity snapshot', function 
         'lock_version' => $startedTicket->lock_version,
         'public_message' => 'The issue has been resolved and confirmed.',
     ])->assertRedirect();
-
     $activity = ActivityEntry::query()->where('ticket_id', $ticket->id)->where('action', 'ticket.resolve')->firstOrFail();
     expect($activity->changes)->toHaveKeys(['resolution_cycle', 'sla_target_seconds', 'sla_consumed_seconds', 'sla_met', 'assigned_agent_id'])
         ->and($activity->changes['sla_target_seconds'])->toBe($ticket->sla_target_seconds)
@@ -166,4 +165,77 @@ it('rejects analytics ranges longer than the documented limit and roles without 
 
     $user = User::factory()->create();
     $this->actingAs($user)->get(route('dashboard.analytics.index'))->assertNotFound();
+});
+
+it('renders detailed analytics and the overview after reading serialized cached metrics', function (): void {
+    config(['cache.default' => 'database']);
+    $ticket = Ticket::factory()->create(['is_active' => true]);
+    $disabledTicket = Ticket::factory()->create(['is_active' => false]);
+
+    $this->actingAs($this->admin)->get(route('tyro-dashboard.index'))->assertOk();
+
+    $this->get(route('dashboard.analytics.index'))
+        ->assertOk()
+        ->assertSee($ticket->number)
+        ->assertSee($disabledTicket->number)
+        ->assertSee('Disabled')
+        ->assertViewHas('analytics', fn (array $data): bool => $data['recent_tickets']->contains(
+            fn (Ticket $recent): bool => $recent->id === $ticket->id && $recent->is_active,
+        ));
+
+    $this->get(route('tyro-dashboard.index'))->assertOk()->assertSee($ticket->number);
+});
+
+it('paginates only active days and preserves period totals and date filters', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-11-20 12:00:00', 'Asia/Dhaka'));
+    for ($day = 1; $day <= 12; $day++) {
+        Ticket::factory()->create([
+            'customer_id' => $this->customer->id, 'created_by' => $this->customer->id,
+            'created_at' => CarbonImmutable::parse('2026-11-01 06:00:00', 'UTC')->addDays($day - 1),
+        ]);
+    }
+    $filters = ['from' => '2026-11-01', 'to' => '2026-11-20', 'activity_per_page' => 10];
+
+    $firstPage = $this->actingAs($this->admin)->get(route('dashboard.analytics.index', $filters))->assertOk();
+    $paginator = $firstPage->viewData('dailyActivity');
+    expect($paginator->total())->toBe(12);
+    expect($paginator->count())->toBe(10);
+    expect($paginator->items()[0]['date'])->toBe('2026-11-12');
+    expect($paginator->nextPageUrl())->toContain('from=2026-11-01', 'to=2026-11-20', 'activity_page=2', '#daily-activity');
+
+    $secondPage = $this->get(route('dashboard.analytics.index', [...$filters, 'activity_page' => 2]))->assertOk();
+    expect(array_column($secondPage->viewData('dailyActivity')->items(), 'date'))->toBe(['2026-11-02', '2026-11-01']);
+    expect($secondPage->viewData('activityTotals')['created'])->toBe(12);
+    expect($secondPage->viewData('analytics')['metrics']['created'])->toBe(12);
+    $this->get(route('dashboard.analytics.index', [...$filters, 'activity_page' => 999]))
+        ->assertOk()->assertViewHas('dailyActivity', fn ($days): bool => $days->currentPage() === 2 && $days->count() === 2);
+});
+
+it('includes days with resolution or closure events even when no tickets were created', function (): void {
+    $ticket = Ticket::factory()->closed()->create([
+        'customer_id' => $this->customer->id, 'created_by' => $this->customer->id,
+        'created_at' => CarbonImmutable::parse('2026-10-31 06:00:00', 'UTC'),
+    ]);
+    foreach (['ticket.resolve' => '2026-11-05', 'ticket.close' => '2026-11-06'] as $action => $date) {
+        ActivityEntry::factory()->create([
+            'ticket_id' => $ticket->id, 'subject_type' => Ticket::class, 'subject_id' => $ticket->id,
+            'action' => $action, 'occurred_at' => CarbonImmutable::parse($date.' 06:00:00', 'UTC'),
+        ]);
+    }
+
+    $response = $this->actingAs($this->admin)->get(route('dashboard.analytics.index', ['from' => '2026-11-01', 'to' => '2026-11-10']))->assertOk();
+
+    expect(array_column($response->viewData('dailyActivity')->items(), 'date'))->toBe(['2026-11-06', '2026-11-05']);
+    expect($response->viewData('activityTotals'))->toBe(['created' => 0, 'resolved' => 1, 'closed' => 1]);
+});
+
+it('shows a clear empty state without idle rows for a period with no activity', function (): void {
+    $this->actingAs($this->admin)->get(route('dashboard.analytics.index', ['from' => '2026-11-01', 'to' => '2026-11-10']))
+        ->assertOk()->assertSee('No activity in this date range')
+        ->assertViewHas('dailyActivity', fn ($days): bool => $days->total() === 0 && $days->count() === 0);
+});
+
+it('validates daily activity pagination and ordering controls', function (): void {
+    $this->actingAs($this->admin)->get(route('dashboard.analytics.index', ['activity_page' => 0, 'activity_per_page' => 500, 'activity_order' => 'invalid']))
+        ->assertSessionHasErrors(['activity_page', 'activity_per_page', 'activity_order']);
 });

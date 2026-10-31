@@ -1,7 +1,7 @@
 <?php
 
 use App\Models\ActivityEntry;
-use App\Models\CalendarVersion;
+use App\Models\BusinessCalendar;
 use App\Models\CommandReceipt;
 use App\Models\ImportRun;
 use App\Models\NotificationDelivery;
@@ -19,13 +19,15 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-test('a ticket cannot pin a calendar from another policy', function () {
+test('a ticket can reference the single current calendar without a policy calendar join', function () {
     $ticket = Ticket::factory()->create();
-    $otherCalendar = CalendarVersion::factory()->published()->create();
+    $otherCalendar = BusinessCalendar::factory()->create();
 
-    expect(fn () => DB::table('tickets')->where('id', $ticket->id)->update([
-        'calendar_version_id' => $otherCalendar->id,
-    ]))->toThrow(QueryException::class);
+    DB::table('tickets')->where('id', $ticket->id)->update([
+        'business_calendar_id' => $otherCalendar->id,
+    ]);
+
+    expect($ticket->fresh()->businessCalendar->is($otherCalendar))->toBeTrue();
 });
 
 test('ticket target snapshots must match their pinned policy and priority', function () {
@@ -36,12 +38,13 @@ test('ticket target snapshots must match their pinned policy and priority', func
     ]))->toThrow(QueryException::class);
 });
 
-test('a referenced policy target cannot be edited underneath a ticket', function () {
+test('SLA targets can be edited directly without creating a new policy version', function () {
     $ticket = Ticket::factory()->create();
 
-    expect(fn () => SlaPolicyTarget::query()->where('sla_policy_id', $ticket->sla_policy_id)->update([
-        'target_seconds' => 12345,
-    ]))->toThrow(QueryException::class);
+    SlaPolicyTarget::query()->where('sla_policy_id', $ticket->sla_policy_id)->update(['target_seconds' => 12345]);
+
+    expect(SlaPolicyTarget::query()->where('sla_policy_id', $ticket->sla_policy_id)->value('target_seconds'))->toBe(12345)
+        ->and($ticket->fresh()->sla_target_seconds)->toBe(7200);
 });
 
 test('invalid ticket lifecycle states are rejected by mysql', function (array $changes) {
@@ -169,9 +172,9 @@ test('default ticket configuration seeding is idempotent on mysql', function () 
     $this->seed(TicketingConfigurationSeeder::class);
     $this->seed(TicketingConfigurationSeeder::class);
 
-    $settings = TicketingSetting::query()->findOrFail(1);
+    TicketingSetting::query()->findOrFail(1);
 
-    expect($settings->current_sla_policy_id)->not->toBeNull()
+    expect(SlaPolicy::query()->count())->toBe(1)
         ->and(DB::table('calendar_windows')->count())->toBe(5)
         ->and(DB::table('sla_policy_targets')->count())->toBe(4);
 });
@@ -229,5 +232,5 @@ test('application migrations can roll back and reapply on a disposable mysql sch
 
     expect(Artisan::call('migrate', ['--database' => 'mysql_schema_test', '--force' => true]))
         ->toBe(0, Artisan::output());
-    $this->assertDatabaseHas('ticketing_settings', ['id' => 1, 'current_sla_policy_id' => null]);
+    $this->assertDatabaseHas('ticketing_settings', ['id' => 1]);
 });

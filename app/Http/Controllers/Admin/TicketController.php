@@ -6,11 +6,14 @@ use App\Enums\TicketBulkAction;
 use App\Enums\TicketTransition;
 use App\Http\Requests\Tickets\BulkTicketRequest;
 use App\Http\Requests\Tickets\StoreTicketRequest;
+use App\Http\Requests\Tickets\TicketDataTableRequest;
 use App\Http\Requests\Tickets\TicketIndexRequest;
 use App\Http\Requests\Tickets\TicketPriorityRequest;
 use App\Http\Requests\Tickets\TransitionTicketRequest;
 use App\Http\Requests\Tickets\UpdateTicketRequest;
+use App\Models\Category;
 use App\Models\Priority;
+use App\Models\Ticket;
 use App\Services\CustomerSlaOverviewService;
 use App\Services\Tickets\AssignmentService;
 use App\Services\Tickets\AttachmentService;
@@ -23,7 +26,9 @@ use HasinHayder\TyroDashboard\Http\Controllers\BaseController;
 use HasinHayder\TyroDashboard\Support\DashboardRoute;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Yajra\DataTables\Facades\DataTables;
 
 class TicketController extends BaseController
 {
@@ -39,7 +44,41 @@ class TicketController extends BaseController
             'queuePreview' => $queries->unassignedQueuePreview($actor),
             'filters' => array_merge(['search' => '', 'status' => 'active', 'sla_state' => ''], $request->validated()),
             'mayCreate' => $mayCreate,
+            'priorities' => Priority::query()->orderBy('sort_order')->get(['id', 'name']),
+            'categories' => Category::query()->orderBy('name')->get(['id', 'name']),
         ]));
+    }
+
+    public function data(TicketDataTableRequest $request, TicketQueryService $queries): JsonResponse
+    {
+        $filters = $request->validated();
+        request()->query->replace($filters);
+        request()->replace($filters);
+        $isAdministrator = in_array('admin', $request->user()->tyroRoleSlugs(), true);
+        $mayBulk = $isAdministrator && $request->user()->can('tickets.bulk');
+        $columns = ['ticket', 'subject', 'status', 'priority', 'category', 'sla', 'created', 'actions'];
+        if ($isAdministrator) {
+            $columns = [...$columns, 'customer', 'assignee'];
+        }
+        if ($mayBulk) {
+            $columns[] = 'selection';
+        }
+
+        $query = $queries->filteredQuery($request->user(), $filters)->select([
+            'tickets.id', 'number', 'subject', 'status', 'is_active', 'lock_version',
+            'priority_id', 'category_id', 'customer_id', 'assigned_agent_id',
+            'sla_due_at', 'sla_warning_at', 'created_at',
+        ]);
+        $table = DataTables::eloquent($query)
+            ->filter(fn (): null => null)
+            ->order(fn ($query) => $query->orderBy('tickets.'.($filters['sort'] ?? 'created_at'), $filters['direction'] ?? 'desc')->orderBy('tickets.id', $filters['direction'] ?? 'desc'))
+            ->setRowId(fn (Ticket $ticket): string => 'ticket-'.$ticket->id)
+            ->setRowClass(fn (Ticket $ticket): string => $ticket->assigned_agent_id === null && in_array($ticket->status->value, ['open', 'in_progress', 'waiting_customer'], true) ? 'ticket-unassigned' : '');
+        foreach ($columns as $column) {
+            $table->addColumn($column, fn (Ticket $ticket): string => view('admin.tickets.partials.list-cell', ['ticket' => $ticket, 'column' => $column])->render());
+        }
+
+        return $table->only($columns)->rawColumns($columns)->toJson();
     }
 
     public function bulk(BulkTicketRequest $request, TicketBulkService $bulk): RedirectResponse
@@ -66,14 +105,20 @@ class TicketController extends BaseController
         return $redirect;
     }
 
-    public function create(TicketService $tickets, CustomerSlaOverviewService $slaOverview): View
+    public function create(Request $request, TicketService $tickets, CustomerSlaOverviewService $slaOverview): View
     {
         $actor = request()->user();
+        $customerSearch = mb_substr(trim((string) $request->query('customer_search', '')), 0, 150);
+        $oldCustomerId = old('customer_id');
+        $selectedCustomerId = is_scalar($oldCustomerId) && ctype_digit((string) $oldCustomerId)
+            ? (int) $oldCustomerId
+            : null;
 
         return view('admin.tickets.create', $this->getViewData([
             'dashboardRoute' => DashboardRoute::class,
             'slaOverview' => $slaOverview->summary(),
-            ...$tickets->creationOptions($actor),
+            ...$tickets->creationOptions($actor, $customerSearch, $selectedCustomerId),
+            'customerSearch' => $customerSearch,
         ]));
     }
 
@@ -111,21 +156,27 @@ class TicketController extends BaseController
             'dashboardRoute' => DashboardRoute::class,
             'ticket' => $record,
             'messages' => $conversations->messagesFor($actor, $record),
-            'sla' => $sla->snapshot($record),
+            'sla' => $sla->countdown($record),
             'transitions' => $tickets->availableTransitions($actor, $record),
             'mayEditContent' => $tickets->canEditContent($actor, $record),
-            'mayChangePriority' => $actor->can('tickets.change_priority')
-                && (in_array('admin', $actor->tyroRoleSlugs(), true) || (int) $record->assigned_agent_id === (int) $actor->getKey()),
+            'mayChangePriority' => in_array('admin', $actor->tyroRoleSlugs(), true) && $actor->can('tickets.change_priority'),
             'mayAssign' => in_array('admin', $actor->tyroRoleSlugs(), true) && $actor->can('tickets.assign'),
             'assignableAgents' => in_array('admin', $actor->tyroRoleSlugs(), true) && $actor->can('tickets.assign')
                 ? $assignments->assignableAgents($actor)
                 : collect(),
-            'priorities' => $actor->can('tickets.change_priority')
+            'priorities' => in_array('admin', $actor->tyroRoleSlugs(), true) && $actor->can('tickets.change_priority')
                 ? Priority::query()->active()->orderBy('sort_order')->orderBy('id')->get()
                 : collect(),
             'mayReply' => $conversations->canReply($actor, $record),
             'mayAddInternalNote' => $conversations->canAddInternalNote($actor, $record),
         ]));
+    }
+
+    public function sla(int $ticket, TicketService $tickets, SlaService $sla): JsonResponse
+    {
+        $record = $tickets->findForActor(request()->user(), $ticket);
+
+        return response()->json($sla->countdown($record))->header('Cache-Control', 'private, no-store');
     }
 
     public function edit(int $ticket, TicketService $tickets): View
@@ -189,7 +240,7 @@ class TicketController extends BaseController
                     'lock_version' => $record->lock_version,
                     'priority_id' => $record->priority_id,
                     'priority' => $record->priority?->name,
-                    'sla_due_at' => $record->sla_due_at?->timezone(config('app.timezone'))->format('d M Y, h:i A'),
+                    'sla_due_at' => $record->sla_due_at?->timezone(config('ticketing.display_timezone', 'Asia/Dhaka'))->format('d M Y, h:i A'),
                 ],
             ]);
         }

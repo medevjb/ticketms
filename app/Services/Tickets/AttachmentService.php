@@ -144,6 +144,16 @@ class AttachmentService
 
     public function download(User $actor, int $attachmentId): StreamedResponse
     {
+        return $this->respond($actor, $attachmentId, false);
+    }
+
+    public function preview(User $actor, int $attachmentId): StreamedResponse
+    {
+        return $this->respond($actor, $attachmentId, true);
+    }
+
+    private function respond(User $actor, int $attachmentId, bool $inline): StreamedResponse
+    {
         $isAdministrator = in_array('admin', $actor->tyroRoleSlugs(), true);
         if (! $actor->is_active || $actor->trashed() || ! $this->permissions->allows($actor, 'tickets.view')) {
             throw new AuthorizationException;
@@ -197,6 +207,18 @@ class AttachmentService
         $filename = trim(preg_replace('/[^A-Za-z0-9._ -]/', '_', $filename) ?? '');
         if ($filename === '') {
             $filename = 'ticket-attachment';
+        }
+
+        if ($inline) {
+            if (! $attachment->isPreviewableImage()) {
+                throw (new ModelNotFoundException)->setModel(TicketAttachment::class, [$attachmentId]);
+            }
+
+            return Storage::disk($disk)->response($attachment->path, $filename, [
+                'Content-Type' => $attachment->mime_type,
+                'Cache-Control' => 'private, no-store',
+                'X-Content-Type-Options' => 'nosniff',
+            ], 'inline');
         }
 
         return Storage::disk($disk)->download($attachment->path, $filename, [

@@ -1,0 +1,244 @@
+openapi: 3.1.0
+info:
+  title: TicketMS User Management API
+  version: 1.0.0
+  description: Admin-only customer account management API. Tyro/Sanctum bearer tokens must have the users.manage ability and current application permission.
+servers:
+  - url: '{baseUrl}/api/v1'
+    variables:
+      baseUrl:
+        default: http://localhost:8000
+security:
+  - bearerAuth: []
+tags:
+  - name: Authentication
+  - name: Users
+paths:
+  /auth/token:
+    post:
+      tags: [Authentication]
+      operationId: issueUserManagementToken
+      summary: Issue a short-lived user-management token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email, maxLength: 255 }
+                password: { type: string, maxLength: 255 }
+                token_name: { type: string, maxLength: 100, default: User Management API }
+      responses:
+        '200':
+          description: Token issued; store the access token securely.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    required: [token_type, access_token, expires_at]
+                    properties:
+                      token_type: { type: string, const: Bearer }
+                      access_token: { type: string }
+                      expires_at: { type: string, format: date-time }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { description: Token issuance limit exceeded. }
+    delete:
+      tags: [Authentication]
+      operationId: revokeCurrentToken
+      summary: Revoke the current bearer token
+      responses:
+        '200':
+          description: Token revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: API token revoked. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /users:
+    get:
+      tags: [Users]
+      operationId: listUsers
+      summary: Search and paginate users
+      parameters:
+        - { name: search, in: query, schema: { type: string, maxLength: 150 } }
+        - { name: status, in: query, schema: { type: string, enum: [active, inactive, archived, all], default: active } }
+        - { name: per_page, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+      responses:
+        '200':
+          description: Paginated user resources.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/User' } }
+                  links: { type: object }
+                  meta: { type: object }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Users]
+      operationId: createCustomer
+      summary: Create an unverified customer account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password, password_confirmation]
+              properties:
+                name: { type: string, maxLength: 255 }
+                email: { type: string, format: email, maxLength: 255 }
+                password: { type: string, minLength: 12 }
+                password_confirmation: { type: string, minLength: 12 }
+      responses:
+        '201':
+          description: Customer created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /users/{account}:
+    parameters:
+      - { name: account, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    get:
+      tags: [Users]
+      operationId: showUser
+      summary: Show a user and ticket counts
+      responses:
+        '200':
+          description: User details.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                      - $ref: '#/components/schemas/User'
+                      - type: object
+                        properties:
+                          ticket_count: { type: integer }
+                          active_ticket_count: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Users]
+      operationId: updateUser
+      summary: Update a user's name and/or email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string, maxLength: 255 }
+                email: { type: string, format: email, maxLength: 255 }
+      responses:
+        '200': { description: Updated user resource. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [Users]
+      operationId: archiveUser
+      summary: Archive a user account
+      responses:
+        '200':
+          description: User archived.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: User archived. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /users/{account}/status:
+    parameters:
+      - { name: account, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    patch:
+      tags: [Users]
+      operationId: setUserActiveStatus
+      summary: Activate or deactivate a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [is_active]
+              properties:
+                is_active: { type: boolean }
+      responses:
+        '200': { description: Updated user resource. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /users/{account}/restore:
+    parameters:
+      - { name: account, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    post:
+      tags: [Users]
+      operationId: restoreUser
+      summary: Restore a user in the inactive state
+      responses:
+        '200': { description: Restored user resource. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum
+  schemas:
+    User:
+      type: object
+      required: [id, name, email, is_active, is_archived, email_verified, roles]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string, format: email }
+        is_active: { type: boolean }
+        is_archived: { type: boolean }
+        email_verified: { type: boolean }
+        roles: { type: array, items: { type: string } }
+        ticket_count: { type: integer }
+        active_ticket_count: { type: integer }
+        created_at: { type: [string, 'null'], format: date-time }
+        updated_at: { type: [string, 'null'], format: date-time }
+  responses:
+    Unauthorized:
+      description: Missing, invalid, expired, or revoked token.
+    Forbidden:
+      description: Token or current account lacks user-management access.
+    NotFound:
+      description: User does not exist or is unavailable for this operation.
+    ValidationError:
+      description: Input validation failed.

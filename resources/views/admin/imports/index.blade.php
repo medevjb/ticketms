@@ -28,12 +28,12 @@
                 <label for="source" class="form-label">Source system</label>
                 <input id="source" name="source" class="form-input" maxlength="64" required value="{{ old('source') }}" aria-describedby="source-help">
                 <small id="source-help" class="page-description">Use a stable identifier such as <code>crm</code>. This key is used with each external ID to prevent duplicate ticket creation.</small>
-                @error('source')<div class="form-error">{{ $message }}</div>@enderror
+
             </div>
             <div class="form-group">
                 <label for="file" class="form-label">CSV file</label>
                 <input id="file" name="file" type="file" class="form-input" accept=".csv,text/csv" required>
-                @error('file')<div class="form-error">{{ $message }}</div>@enderror
+
             </div>
             <button type="submit" class="btn btn-primary">Queue import</button>
         </form>
@@ -64,14 +64,14 @@
                 @forelse($runs as $run)
                     <tr>
                         <td><a href="{{ route('dashboard.ticket-imports.show', $run->id) }}">#{{ $run->id }}</a></td>
-                        <td><code>{{ $run->source }}</code></td>
+                        <td><code><span title="{{ $run->source }}">{{ str($run->source)->limit(36) }}</span></code></td>
                         <td>{{ str($run->processing_status->value)->replace('_', ' ')->title() }}</td>
                         <td>{{ number_format($run->processed_rows) }}</td>
                         <td>{{ number_format($run->created_rows) }}</td>
                         <td>{{ number_format($run->invalid_rows) }}</td>
                         <td>{{ number_format($run->duplicate_rows) }}</td>
-                        <td>{{ $run->uploader?->name ?? 'Unavailable' }}</td>
-                        <td>{{ $run->created_at?->timezone(config('app.timezone'))->format('Y-m-d H:i') }}</td>
+                        <td><span title="{{ $run->uploader?->name ?? 'Unavailable' }}">{{ str($run->uploader?->name ?? 'Unavailable')->limit(36) }}</span></td>
+                        <td>{{ $run->created_at?->timezone(config('ticketing.display_timezone', 'Asia/Dhaka'))->format('Y-m-d H:i') }}</td>
                     </tr>
                 @empty
                     <tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--muted-foreground)">No import runs match this filter.</td></tr>

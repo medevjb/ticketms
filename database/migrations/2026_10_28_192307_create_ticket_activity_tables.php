@@ -29,6 +29,7 @@ return new class extends Migration
             $table->unique(['id', 'ticket_id'], 'activity_ticket_uq');
             $table->index(['ticket_id', 'occurred_at', 'id'], 'ticket_activity_list_idx');
             $table->index(['subject_type', 'subject_id', 'occurred_at', 'id'], 'subject_activity_list_idx');
+            $table->index(['action', 'occurred_at', 'ticket_id'], 'activity_action_date_ticket_idx');
         });
 
         Schema::create('ticket_sla_intervals', function (Blueprint $table): void {

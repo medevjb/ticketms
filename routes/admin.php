@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\AgentManagementController;
 use App\Http\Controllers\Admin\AnalyticsController;
 use App\Http\Controllers\Admin\CalendarController;
 use App\Http\Controllers\Admin\CategoryController;
+use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ImportController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\PriorityController;
@@ -13,13 +14,31 @@ use App\Http\Controllers\Admin\TicketAssignmentController;
 use App\Http\Controllers\Admin\TicketAttachmentController;
 use App\Http\Controllers\Admin\TicketController;
 use App\Http\Controllers\Admin\TicketConversationController;
+use App\Http\Controllers\Admin\TimezoneSettingsController;
+use App\Http\Controllers\Admin\UserController;
 use App\Http\Middleware\EnsureInternalDashboardAccess;
+use HasinHayder\TyroDashboard\Support\DashboardRoute;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/'.trim((string) config('tyro-dashboard.routes.prefix', 'dashboard'), '/'), [DashboardController::class, 'index'])
+    ->middleware(['auth', EnsureInternalDashboardAccess::class])
+    ->name(DashboardRoute::name('index'));
 
 Route::prefix(trim((string) config('tyro-dashboard.routes.prefix', 'dashboard'), '/'))
     ->middleware(['auth', EnsureInternalDashboardAccess::class])
     ->name('dashboard.')
     ->group(function (): void {
+        Route::middleware('can:tickets.view')->group(function (): void {
+            Route::get('/people', [UserController::class, 'index'])->name('users.index');
+            Route::middleware(['tyro-dashboard.admin', 'can:users.manage'])->group(function (): void {
+                Route::get('/people/create', [UserController::class, 'create'])->name('users.create');
+                Route::post('/people', [UserController::class, 'store'])->name('users.store');
+                Route::post('/people/bulk', [AccessManagementController::class, 'bulkUsers'])->name('users.bulk');
+                Route::get('/people/{user}/edit', [UserController::class, 'edit'])->whereNumber('user')->name('users.edit');
+                Route::put('/people/{user}', [UserController::class, 'update'])->whereNumber('user')->name('users.update');
+            });
+            Route::get('/people/{user}', [UserController::class, 'show'])->whereNumber('user')->name('users.show');
+        });
         Route::middleware('can:notifications.view')->group(function (): void {
             Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
             Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
@@ -29,10 +48,12 @@ Route::prefix(trim((string) config('tyro-dashboard.routes.prefix', 'dashboard'),
         Route::get('/analytics', [AnalyticsController::class, 'index'])
             ->middleware('can:analytics.view')->name('analytics.index');
         Route::get('/tickets', [TicketController::class, 'index'])->name('tickets.index');
+        Route::get('/tickets/data', [TicketController::class, 'data'])->name('tickets.data');
         Route::get('/tickets/create', [TicketController::class, 'create'])->name('tickets.create');
         Route::post('/tickets', [TicketController::class, 'store'])
             ->middleware('throttle:ticket-create')->name('tickets.store');
         Route::get('/tickets/{ticket}', [TicketController::class, 'show'])->whereNumber('ticket')->name('tickets.show');
+        Route::get('/tickets/{ticket}/sla', [TicketController::class, 'sla'])->whereNumber('ticket')->name('tickets.sla');
         Route::get('/tickets/{ticket}/edit', [TicketController::class, 'edit'])->whereNumber('ticket')->name('tickets.edit');
         Route::put('/tickets/{ticket}', [TicketController::class, 'update'])->whereNumber('ticket')->name('tickets.update');
         Route::patch('/tickets/{ticket}/transition', [TicketController::class, 'transition'])->whereNumber('ticket')->name('tickets.transition');
@@ -43,6 +64,8 @@ Route::prefix(trim((string) config('tyro-dashboard.routes.prefix', 'dashboard'),
             ->whereNumber('ticket')->middleware('throttle:ticket-replies')->name('tickets.messages.store');
         Route::post('/tickets/{ticket}/messages/{message}/moderate', [TicketConversationController::class, 'moderate'])
             ->whereNumber('ticket')->whereNumber('message')->name('tickets.messages.moderate');
+        Route::get('/ticket-attachments/{attachment}/preview', [TicketAttachmentController::class, 'preview'])
+            ->whereNumber('attachment')->middleware('throttle:ticket-downloads')->name('ticket-attachments.preview');
         Route::get('/ticket-attachments/{attachment}/download', [TicketAttachmentController::class, 'download'])
             ->whereNumber('attachment')->middleware('throttle:ticket-downloads')->name('ticket-attachments.download');
         Route::post('/tickets/{ticket}/attachments/{attachment}/moderate', [TicketAttachmentController::class, 'moderate'])
@@ -53,6 +76,8 @@ Route::prefix(trim((string) config('tyro-dashboard.routes.prefix', 'dashboard'),
     ->middleware(['auth', 'tyro-dashboard.admin'])
     ->name('dashboard.')
     ->group(function (): void {
+        Route::put('/settings/timezone', [TimezoneSettingsController::class, 'update'])->middleware('can:users.manage')->name('settings.timezone');
+
         Route::middleware('can:agents.manage')->group(function (): void {
             Route::get('/agents', [AgentManagementController::class, 'index'])->name('agents.index');
             Route::get('/agents/create', [AgentManagementController::class, 'create'])->name('agents.create');
@@ -108,27 +133,13 @@ Route::prefix(trim((string) config('tyro-dashboard.routes.prefix', 'dashboard'),
         });
 
         Route::middleware('can:calendars.manage')->group(function (): void {
-            Route::get('/calendars', [CalendarController::class, 'index'])->name('calendars.index');
-            Route::post('/calendars/clone', [CalendarController::class, 'clone'])->name('calendars.clone');
-            Route::post('/calendars/bulk', [CalendarController::class, 'bulk'])->name('calendars.bulk');
-            Route::put('/calendars/{calendar}', [CalendarController::class, 'update'])->name('calendars.update');
-            Route::get('/calendars/{calendar}/edit', [CalendarController::class, 'edit'])->name('calendars.edit');
-            Route::post('/calendars/{calendar}/publish', [CalendarController::class, 'publish'])->name('calendars.publish');
-            Route::patch('/calendars/{calendar}/availability', [CalendarController::class, 'availability'])->name('calendars.availability');
-            Route::post('/calendars/{calendar}/archive', [CalendarController::class, 'archive'])->name('calendars.archive');
-            Route::post('/calendars/{calendar}/restore', [CalendarController::class, 'restore'])->name('calendars.restore');
+            Route::get('/business-calendar', [CalendarController::class, 'index'])->name('calendars.index');
+            Route::put('/business-calendar', [CalendarController::class, 'update'])->name('calendars.update');
         });
 
         Route::middleware('can:sla.manage')->group(function (): void {
-            Route::get('/sla-policies', [SlaPolicyController::class, 'index'])->name('sla-policies.index');
-            Route::post('/sla-policies/clone', [SlaPolicyController::class, 'clone'])->name('sla-policies.clone');
-            Route::post('/sla-policies/bulk', [SlaPolicyController::class, 'bulk'])->name('sla-policies.bulk');
-            Route::put('/sla-policies/{policy}', [SlaPolicyController::class, 'update'])->name('sla-policies.update');
-            Route::get('/sla-policies/{policy}/edit', [SlaPolicyController::class, 'edit'])->name('sla-policies.edit');
-            Route::post('/sla-policies/{policy}/publish', [SlaPolicyController::class, 'publish'])->name('sla-policies.publish');
-            Route::patch('/sla-policies/{policy}/availability', [SlaPolicyController::class, 'availability'])->name('sla-policies.availability');
-            Route::post('/sla-policies/{policy}/archive', [SlaPolicyController::class, 'archive'])->name('sla-policies.archive');
-            Route::post('/sla-policies/{policy}/restore', [SlaPolicyController::class, 'restore'])->name('sla-policies.restore');
+            Route::get('/sla-policy', [SlaPolicyController::class, 'index'])->name('sla-policies.index');
+            Route::put('/sla-policy', [SlaPolicyController::class, 'update'])->name('sla-policies.update');
         });
 
         Route::middleware('can:imports.manage')->group(function (): void {

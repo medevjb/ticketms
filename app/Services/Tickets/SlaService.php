@@ -3,7 +3,7 @@
 namespace App\Services\Tickets;
 
 use App\Enums\TicketStatus;
-use App\Models\CalendarVersion;
+use App\Models\BusinessCalendar;
 use App\Models\Ticket;
 use App\Models\TicketSlaInterval;
 use Carbon\CarbonImmutable;
@@ -17,7 +17,7 @@ class SlaService
      * @return array{warning_at: CarbonImmutable, due_at: CarbonImmutable}
      */
     public function creationProjection(
-        CalendarVersion $calendar,
+        BusinessCalendar $calendar,
         CarbonImmutable $startedAt,
         int $targetSeconds,
         int $warningPercent,
@@ -32,7 +32,7 @@ class SlaService
 
     public function consumedSeconds(Ticket $ticket, CarbonImmutable $asOf): int
     {
-        $calendar = $ticket->calendarVersion;
+        $calendar = $ticket->businessCalendar;
         $startedAt = $ticket->sla_started_at;
         if ($calendar === null) {
             throw ValidationException::withMessages(['ticket' => 'The ticket is missing its pinned SLA calendar.']);
@@ -92,7 +92,7 @@ class SlaService
             ];
         }
 
-        $calendar = $ticket->calendarVersion;
+        $calendar = $ticket->businessCalendar;
         $policy = $ticket->slaPolicy;
         $startedAt = $ticket->sla_started_at;
         if ($calendar === null || $policy === null) {
@@ -101,8 +101,13 @@ class SlaService
 
         $warningSeconds = intdiv(((int) $ticket->sla_target_seconds * (int) $policy->warning_percent) + 99, 100);
         $intervals = $this->intervals($ticket);
-        $warningAt = $this->thresholdAt($calendar, $startedAt, $warningSeconds, $intervals, $asOf);
-        $dueAt = $this->thresholdAt($calendar, $startedAt, (int) $ticket->sla_target_seconds, $intervals, $asOf);
+        $atInitialSlaStart = $intervals->isEmpty() && $asOf->equalTo($startedAt->utc()->startOfSecond());
+        $warningAt = $atInitialSlaStart
+            ? $ticket->sla_warning_at
+            : $this->thresholdAt($calendar, $startedAt, $warningSeconds, $intervals, $asOf);
+        $dueAt = $atInitialSlaStart
+            ? $ticket->sla_due_at
+            : $this->thresholdAt($calendar, $startedAt, (int) $ticket->sla_target_seconds, $intervals, $asOf);
         $state = $consumed >= (int) $ticket->sla_target_seconds
             ? 'breached'
             : ($consumed >= $warningSeconds ? 'approaching' : 'within');
@@ -116,12 +121,37 @@ class SlaService
         ];
     }
 
+    /** @return array<string, mixed> */
+    public function countdown(Ticket $ticket): array
+    {
+        $now = CarbonImmutable::now('UTC')->startOfSecond();
+        $snapshot = $this->snapshot($ticket, $now);
+        $countingUntil = null;
+        if (! in_array($snapshot['state'], ['paused', 'stopped', 'breached'], true) && $ticket->businessCalendar !== null) {
+            $calendar = $ticket->businessCalendar;
+            $timezone = $this->timezone($calendar);
+            $local = $now->setTimezone($timezone);
+            $date = $local->format('Y-m-d');
+            $schedule = $this->schedule($calendar, $date, $date);
+            $window = $schedule['windows'][$local->isoWeekday()] ?? null;
+            if ($window !== null && ! isset($schedule['holidays'][$date])) {
+                $opens = CarbonImmutable::parse($date.' '.$window['opens_at'], $timezone)->utc();
+                $closes = CarbonImmutable::parse($date.' '.$window['closes_at'], $timezone)->utc();
+                if ($now->greaterThanOrEqualTo($opens) && $now->lessThan($closes)) {
+                    $countingUntil = $closes->timestamp;
+                }
+            }
+        }
+
+        return [...$snapshot, 'server_time' => $now->timestamp, 'counting_until' => $countingUntil];
+    }
+
     /**
      * @return array{warning_at: CarbonImmutable, due_at: CarbonImmutable}
      */
     public function activeProjection(Ticket $ticket, CarbonImmutable $asOf): array
     {
-        $calendar = $ticket->calendarVersion;
+        $calendar = $ticket->businessCalendar;
         $policy = $ticket->slaPolicy;
         $startedAt = $ticket->sla_started_at;
         if ($calendar === null || $policy === null) {
@@ -141,7 +171,7 @@ class SlaService
 
     public function breachAt(Ticket $ticket, CarbonImmutable $asOf): ?CarbonImmutable
     {
-        $calendar = $ticket->calendarVersion;
+        $calendar = $ticket->businessCalendar;
         $startedAt = $ticket->sla_started_at;
         if ($calendar === null) {
             throw ValidationException::withMessages(['ticket' => 'The ticket is missing its pinned SLA calendar.']);
@@ -155,7 +185,7 @@ class SlaService
         return $this->thresholdAt($calendar, $startedAt, $threshold, $this->intervals($ticket), $asOf);
     }
 
-    public function addBusinessSeconds(CalendarVersion $calendar, CarbonImmutable $from, int $seconds): CarbonImmutable
+    public function addBusinessSeconds(BusinessCalendar $calendar, CarbonImmutable $from, int $seconds): CarbonImmutable
     {
         if ($seconds < 0) {
             throw ValidationException::withMessages(['sla' => 'SLA duration cannot be negative.']);
@@ -200,7 +230,7 @@ class SlaService
         throw ValidationException::withMessages(['sla' => 'The configured calendar has no reachable business time within the ten-year calculation limit.']);
     }
 
-    public function businessSecondsBetween(CalendarVersion $calendar, CarbonImmutable $from, CarbonImmutable $to): int
+    public function businessSecondsBetween(BusinessCalendar $calendar, CarbonImmutable $from, CarbonImmutable $to): int
     {
         $start = $from->utc()->startOfSecond();
         $end = $to->utc()->startOfSecond();
@@ -239,7 +269,7 @@ class SlaService
      * @param  Collection<int, TicketSlaInterval>  $intervals
      */
     private function thresholdAt(
-        CalendarVersion $calendar,
+        BusinessCalendar $calendar,
         CarbonImmutable $startedAt,
         int $thresholdSeconds,
         Collection $intervals,
@@ -300,7 +330,7 @@ class SlaService
      *   holidays: array<string, true>
      * }
      */
-    private function schedule(CalendarVersion $calendar, string $fromDate, string $toDate): array
+    private function schedule(BusinessCalendar $calendar, string $fromDate, string $toDate): array
     {
         $windows = [];
         foreach ($calendar->windows()->orderBy('weekday')->get() as $window) {
@@ -311,14 +341,14 @@ class SlaService
         }
 
         $holidays = [];
-        foreach ($calendar->holidays()->whereBetween('holiday_date', [$fromDate, $toDate])->pluck('holiday_date') as $holiday) {
+        foreach ($calendar->holidays()->whereBetween('holiday_date', [$fromDate, $toDate.' 23:59:59'])->pluck('holiday_date') as $holiday) {
             $holidays[substr((string) $holiday, 0, 10)] = true;
         }
 
         return ['windows' => $windows, 'holidays' => $holidays];
     }
 
-    private function timezone(CalendarVersion $calendar): DateTimeZone
+    private function timezone(BusinessCalendar $calendar): DateTimeZone
     {
         try {
             return new DateTimeZone($calendar->timezone);

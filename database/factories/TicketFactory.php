@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\BusinessCalendar;
 use App\Models\Category;
 use App\Models\SlaPolicy;
 use App\Models\SlaPolicyTarget;
@@ -20,8 +21,8 @@ class TicketFactory extends Factory
             'customer_id' => User::factory(),
             'created_by' => fn (array $attributes): int => $attributes['customer_id'],
             'category_id' => Category::factory(),
-            'sla_policy_id' => SlaPolicy::factory()->published(),
-            'calendar_version_id' => fn (array $attributes): int => SlaPolicy::query()->whereKey($attributes['sla_policy_id'])->firstOrFail()->calendar_version_id,
+            'sla_policy_id' => SlaPolicy::factory(),
+            'business_calendar_id' => BusinessCalendar::factory(),
             'priority_id' => fn (array $attributes): int => SlaPolicyTarget::factory()->create(['sla_policy_id' => $attributes['sla_policy_id'], 'target_seconds' => 7200])->priority_id,
             'subject' => fake()->sentence(),
             'description' => fake()->paragraph(),

@@ -4,10 +4,9 @@ namespace App\Services\Tickets;
 
 use App\Enums\ActorKind;
 use App\Enums\MessageVisibility;
-use App\Enums\PublicationState;
 use App\Enums\TicketStatus;
 use App\Enums\TicketTransition;
-use App\Models\CalendarVersion;
+use App\Models\BusinessCalendar;
 use App\Models\Category;
 use App\Models\Priority;
 use App\Models\SlaPolicy;
@@ -44,7 +43,7 @@ class TicketService
     ) {}
 
     /** @return array{categories: Collection<int, Category>, priorities: Collection<int, Priority>, customers: Collection<int, User>} */
-    public function creationOptions(User $actor): array
+    public function creationOptions(User $actor, string $customerSearch = '', ?int $selectedCustomerId = null): array
     {
         $this->authorize($actor, 'tickets.create');
         if (! $this->isAdministrator($actor) && ! $this->isCustomer($actor)) {
@@ -55,7 +54,18 @@ class TicketService
         $customers = $this->isAdministrator($actor)
             ? User::query()->active()->whereNotNull('email_verified_at')->whereHas('roles', function (Builder $query): void {
                 $query->where('name', 'customer')->where('is_active', true)->whereNull('deleted_at');
-            })->orderBy('name')->orderBy('id')->get(['id', 'name', 'email'])
+            })->when(trim($customerSearch) !== '' || $selectedCustomerId !== null, function (Builder $query) use ($customerSearch, $selectedCustomerId): void {
+                $query->where(function (Builder $matches) use ($customerSearch, $selectedCustomerId): void {
+                    if (trim($customerSearch) !== '') {
+                        $matches->where('name', 'like', '%'.trim($customerSearch).'%')
+                            ->orWhere('email', 'like', '%'.trim($customerSearch).'%');
+                    }
+
+                    if ($selectedCustomerId !== null) {
+                        $matches->orWhereKey($selectedCustomerId);
+                    }
+                });
+            })->orderBy('name')->orderBy('id')->limit(50)->get(['id', 'name', 'email'])
             : new Collection;
 
         return [
@@ -98,7 +108,7 @@ class TicketService
         try {
             $ticket = DB::transaction(function () use ($actor, $payload, $operationKey, $stagedFiles, $externalReference, &$retainStagedFiles): Ticket {
                 $retainStagedFiles = false;
-                $settings = TicketingSetting::query()->whereKey(1)->lockForUpdate()->firstOrFail();
+                TicketingSetting::query()->whereKey(1)->lockForUpdate()->firstOrFail();
                 $lockedActor = User::query()->whereKey($actor->getKey())->lockForUpdate()->firstOrFail();
                 $this->authorize($lockedActor, 'tickets.create');
                 $this->ensureVerifiedCustomer($lockedActor);
@@ -123,14 +133,8 @@ class TicketService
                     throw ValidationException::withMessages(['priority_id' => 'Choose an enabled priority.']);
                 }
 
-                $policy = SlaPolicy::query()->whereKey($settings->current_sla_policy_id)->lockForUpdate()->firstOrFail();
-                if ($policy->publication_state !== PublicationState::Published || ! $policy->is_active) {
-                    throw ValidationException::withMessages(['sla' => 'The current SLA policy is not available for ticket creation.']);
-                }
-                $calendar = CalendarVersion::query()->whereKey($policy->calendar_version_id)->lockForUpdate()->firstOrFail();
-                if ($calendar->publication_state !== PublicationState::Published || ! $calendar->is_active) {
-                    throw ValidationException::withMessages(['sla' => 'The current SLA calendar is not available for ticket creation.']);
-                }
+                $policy = SlaPolicy::query()->lockForUpdate()->firstOrFail();
+                $calendar = BusinessCalendar::query()->with('windows')->lockForUpdate()->firstOrFail();
                 $target = SlaPolicyTarget::query()
                     ->where('sla_policy_id', $policy->getKey())
                     ->where('priority_id', $priority->getKey())
@@ -156,7 +160,7 @@ class TicketService
                     'description' => $payload['description'],
                     'status' => TicketStatus::Open,
                     'sla_policy_id' => $policy->getKey(),
-                    'calendar_version_id' => $calendar->getKey(),
+                    'business_calendar_id' => $calendar->getKey(),
                     'sla_target_seconds' => $target->target_seconds,
                     'sla_started_at' => $startedAt,
                     'sla_due_at' => $projection['due_at'],
@@ -186,7 +190,7 @@ class TicketService
                     'category_id' => $category->getKey(),
                     'priority_id' => $priority->getKey(),
                     'sla_policy_id' => $policy->getKey(),
-                    'calendar_version_id' => $calendar->getKey(),
+                    'business_calendar_id' => $calendar->getKey(),
                     'sla_target_seconds' => $target->target_seconds,
                 ]);
                 $ticket = $this->assignments->assignAutomatically($ticket, $operationKey);
@@ -195,7 +199,7 @@ class TicketService
                 $this->operations->complete($operationKey, $ticket, 'created');
                 $retainStagedFiles = true;
 
-                return $ticket->load(['customer', 'category', 'priority', 'slaPolicy', 'calendarVersion']);
+                return $ticket->load(['customer', 'category', 'priority', 'slaPolicy', 'businessCalendar']);
             }, attempts: 3);
         } catch (Throwable $exception) {
             $this->attachments->discard($stagedFiles);
@@ -225,7 +229,7 @@ class TicketService
         }
 
         $ticket = $query->whereKey($ticketId)->with([
-            'customer', 'creator', 'assignedAgent', 'category', 'priority', 'slaPolicy', 'calendarVersion',
+            'customer', 'creator', 'assignedAgent', 'category', 'priority', 'slaPolicy', 'businessCalendar',
             'attachments' => function (HasMany $query) use ($actor): void {
                 $query->whereNull('ticket_message_id');
                 if (! $this->isAdministrator($actor)) {
@@ -596,7 +600,7 @@ class TicketService
                 $this->operations->complete($operationKey, $ticket, $transition->value);
                 $retainStagedFiles = true;
 
-                return $ticket->load(['customer', 'category', 'priority', 'slaPolicy', 'calendarVersion']);
+                return $ticket->load(['customer', 'category', 'priority', 'slaPolicy', 'businessCalendar']);
             }, attempts: 3);
         } catch (Throwable $exception) {
             $this->attachments->discard($stagedFiles);
@@ -617,12 +621,18 @@ class TicketService
         int $expectedVersion,
         string $operationKey,
     ): Ticket {
+        if (! in_array('admin', $actor->tyroRoleSlugs(), true)) {
+            throw new AuthorizationException;
+        }
         $this->authorize($actor, 'tickets.change_priority');
         $payload = ['ticket_id' => $ticketId, 'priority_id' => $priorityId, 'lock_version' => $expectedVersion];
 
         return DB::transaction(function () use ($actor, $ticketId, $priorityId, $expectedVersion, $operationKey, $payload): Ticket {
             $ticket = Ticket::query()->whereKey($ticketId)->lockForUpdate()->firstOrFail();
             $lockedActor = User::query()->whereKey($actor->getKey())->lockForUpdate()->firstOrFail();
+            if (! in_array('admin', $lockedActor->tyroRoleSlugs(), true)) {
+                throw new AuthorizationException;
+            }
             $this->authorize($lockedActor, 'tickets.change_priority');
             $receiptTicket = $this->operations->reserve($lockedActor, 'ticket.change_priority', $operationKey, $payload);
             if ($receiptTicket !== null) {

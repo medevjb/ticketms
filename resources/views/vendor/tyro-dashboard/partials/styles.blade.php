@@ -3142,4 +3142,24 @@
             }
         }
     }
+
+    .workspace-topbar { min-height:72px; gap:20px; padding:12px 28px; border-bottom:1px solid var(--border); background:var(--background); }
+    .workspace-topbar .topbar-left { min-width:0; gap:14px; }
+    .workspace-page-context { min-width:0; display:grid; gap:5px; }
+    .workspace-eyebrow { color:var(--muted-foreground); font-size:10px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; }
+    .workspace-topbar .breadcrumb { margin:0; flex-wrap:wrap; font-size:12px; gap:8px; }
+    .workspace-topbar .topbar-right { gap:10px; flex-shrink:0; }
+    .workspace-timezone { font-size:11px; color:var(--muted-foreground); padding:6px 10px; border:1px solid var(--border); border-radius:6px; }
+    .workspace-topbar .topbar-btn { width:36px; height:36px; border-radius:8px; position:relative; }
+    .workspace-topbar .user-dropdown-btn { padding:5px 8px; gap:10px; border:1px solid var(--border); border-radius:10px; background:var(--card); }
+    .workspace-topbar .user-avatar { width:32px; height:32px; font-size:13px; }
+    .workspace-topbar .user-name { max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
+    .workspace-topbar .user-role { font-size:10px; text-transform:capitalize; }
+    .workspace-topbar .user-dropdown-menu { min-width:220px; top:calc(100% + 10px); padding:6px; border:1px solid var(--border); box-shadow:0 12px 30px rgb(0 0 0 / .12); }
+    .workspace-account-heading { padding:9px 10px; font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted-foreground); }
+    .workspace-topbar .dropdown-item { border-radius:6px; font-size:12px; }
+    .workspace-topbar button:focus-visible,.workspace-topbar a:focus-visible { outline:2px solid var(--ring); outline-offset:3px; }
+    .workspace-topbar .user-dropdown.active .user-dropdown-arrow { transform:rotate(180deg); }
+    @media(max-width:1000px) { .workspace-timezone { display:none; } }
+    @media(max-width:640px) { .workspace-topbar { padding:10px 14px; gap:10px; } .workspace-topbar .user-info { display:none; } .workspace-topbar .topbar-right { gap:4px; } .workspace-topbar .user-dropdown-btn { gap:4px; padding:4px; } .workspace-eyebrow { display:none; } .workspace-topbar .breadcrumb { font-size:11px; gap:4px; } }
 </style>

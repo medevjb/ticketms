@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['target_seconds'])]
+#[Fillable(['priority_id', 'target_seconds'])]
 class SlaPolicyTarget extends Model
 {
     /** @use HasFactory<SlaPolicyTargetFactory> */
@@ -29,7 +29,7 @@ class SlaPolicyTarget extends Model
     /** @return BelongsTo<SlaPolicy, $this> */
     public function slaPolicy(): BelongsTo
     {
-        return $this->belongsTo(SlaPolicy::class, 'sla_policy_id')->withTrashed();
+        return $this->belongsTo(SlaPolicy::class, 'sla_policy_id');
     }
 
     /** @return BelongsTo<Priority, $this> */

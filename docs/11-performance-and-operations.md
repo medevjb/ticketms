@@ -64,3 +64,33 @@ No hard deletion of business/audit records in initial release. Legal retention/a
 ## Scale triggers
 
 Measure before changing topology: sustained DB queue contention=>consider Redis; slow role-scoped fulltext=>evaluate search service; historical dashboard latency=>summary tables/queued reports; assignment lock bottleneck=>design finer allocation locks with equivalent concurrency tests. Add replicas only for stale-tolerant reads and document read-after-write behavior. No initial partitioning/sharding/microservices. Every change requires traceable requirement, observed bottleneck and rollback plan.
+
+## Ticket worklist: Yajra DataTables
+
+The internal ticket list is the only module using Yajra DataTables. Tickets are the primary daily operational worklist, with frequent searches, assignment decisions, SLA reviews, sorting and paging. Fetching bounded pages from the server supports a growing ticket volume without loading the full result set into the browser. This is an implementation choice, not a claim that the performance targets above have been benchmarked.
+
+Other module tables retain their existing Laravel pagination and forms. Categories, priorities, calendars, policies, users, agents and imports do not need this additional interaction layer for the current requirements. The agent unassigned-queue preview also stays a regular bounded table. Do not initialize DataTables globally or add its assets to the shared dashboard layout.
+
+### Implementation and dependencies
+
+- Backend: `yajra/laravel-datatables-oracle` 13.x, installed for Laravel 13. See the [Yajra installation documentation](https://yajrabox.com/docs/laravel-datatables/13.0/installation).
+- Frontend: `datatables.net-dt` 2.x, bundled through Vite. `resources/js/ticket-table.ts` and `resources/css/ticket-table.css` load only on `admin.tickets.index`.
+- `GET /dashboard/tickets/data` (`dashboard.tickets.data`) provides the server-side JSON response. The dashboard prefix follows application configuration. The frontend resolves the controller URL with Wayfinder.
+- `TicketQueryService::filteredQuery()` is shared with the regular paginated list. Agents remain restricted to assigned tickets; administrators can filter assignment, customer and agent. The customer portal does not use this endpoint.
+- Requests require a nonnegative `draw` and `start`, a page length of 15, 30 or 50, and a whitelisted sort field/direction. Unlimited page requests and arbitrary sort fields are rejected. See the [DataTables server-side protocol](https://datatables.net/manual/server-side).
+- Search, worklist, priority, category, assignment, SLA and staff-local date filters run on the server. Ticket number, SLA deadline and creation date support header sorting. Filtered counts describe the currently scoped worklist; they never disclose organization totals to agents.
+- Only explicit display columns are returned. Blade escapes ticket and customer text before producing HTML cells. Customer conversations, private files, passwords and raw model attributes are excluded.
+- Amber rows and an explicit Unassigned badge identify active tickets needing an owner. Critical/high/medium/low priorities use distinct badges with text labels. Custom priorities use a neutral badge.
+- Bulk selection applies to the displayed page and resets on redraw. Every selected row still submits its ticket ID and lock version to the existing authorized bulk workflow.
+- Normal paginated HTML is retained for browsing without JavaScript. AJAX failures and validation errors use toast notifications.
+
+After changing the integration, run `php artisan test --compact tests/Feature/TicketDataTableTest.php`, the affected ticket workflow/assignment tests, `npm run types:check`, and `npm run build`. Verify actual query timings separately before making scale or latency claims.
+
+
+### Staff display timezone
+
+Administrators with user-management permission can select a display timezone in **System Settings → Display timezone**. The setting is saved as the whitelisted `TICKETING_DISPLAY_TIMEZONE` environment key, following the dashboard's existing environment-settings persistence pattern. Saving clears the configuration cache; it does not rewrite other environment keys. An unwritable environment file returns a toast error.
+
+`ticketing.display_timezone` defaults to `Asia/Dhaka`. Staff timestamps and internal ticket date-filter boundaries use that setting. UTC storage, PHP's application timezone, customer-portal date filters, analytics reporting buckets and pinned SLA business-calendar timezones stay unchanged. The ticket toolbar and header identify the active display timezone. SLA deadlines are displayed in the selected zone without recalculating their underlying instant or business-time budget.
+
+The ticket filter panel keeps secondary filters in **More filters**. The toolbar groups timezone/refresh on the left and page-scoped bulk controls on the right. My Profile is accessed from the header account dropdown. Generic Invitation Links and Referrals modules are disabled; the app-owned agent invitation workflow remains available.

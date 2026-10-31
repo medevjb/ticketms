@@ -23,6 +23,25 @@ class TicketQueryService
      */
     public function paginate(User $actor, array $filters): LengthAwarePaginator
     {
+        $query = $this->filteredQuery($actor, $filters);
+
+        $sort = in_array($filters['sort'] ?? '', ['created_at', 'updated_at', 'number', 'sla_due_at'], true)
+            ? (string) $filters['sort']
+            : 'created_at';
+        $direction = ($filters['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+        $perPage = in_array((int) ($filters['per_page'] ?? 15), [15, 30, 50], true)
+            ? (int) ($filters['per_page'] ?? 15)
+            : 15;
+
+        return $query->orderBy($sort, $direction)->orderBy('id', $direction)->paginate($perPage);
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return Builder<Ticket>
+     */
+    public function filteredQuery(User $actor, array $filters): Builder
+    {
         $this->authorize($actor, 'tickets.view');
         $this->authorize($actor, 'tickets.search');
         $this->ensureVerifiedCustomer($actor);
@@ -64,18 +83,16 @@ class TicketQueryService
         }
 
         $this->applySlaFilter($query, (string) ($filters['sla_state'] ?? ''), CarbonImmutable::now('UTC'));
-        $this->applyDateFilters($query, $filters);
+        $this->applyDateFilters($query, $filters, $this->isCustomer($actor) ? 'Asia/Dhaka' : (string) config('ticketing.display_timezone', 'Asia/Dhaka'));
         $this->applySearch($query, trim((string) ($filters['search'] ?? '')));
 
-        $sort = in_array($filters['sort'] ?? '', ['created_at', 'updated_at', 'number', 'sla_due_at'], true)
-            ? (string) $filters['sort']
-            : 'created_at';
-        $direction = ($filters['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
-        $perPage = in_array((int) ($filters['per_page'] ?? 15), [15, 30, 50], true)
-            ? (int) ($filters['per_page'] ?? 15)
-            : 15;
+        if (($filters['assignment'] ?? '') === 'unassigned') {
+            $query->whereNull('assigned_agent_id');
+        } elseif (($filters['assignment'] ?? '') === 'assigned') {
+            $query->whereNotNull('assigned_agent_id');
+        }
 
-        return $query->orderBy($sort, $direction)->orderBy('id', $direction)->paginate($perPage);
+        return $query;
     }
 
     /** @return Collection<int, Ticket> */
@@ -137,14 +154,14 @@ class TicketQueryService
      * @param  Builder<Ticket>  $query
      * @param  array<string, mixed>  $filters
      */
-    private function applyDateFilters(Builder $query, array $filters): void
+    private function applyDateFilters(Builder $query, array $filters, string $timezone): void
     {
         if (! empty($filters['date_from'])) {
-            $from = CarbonImmutable::parse((string) $filters['date_from'], 'Asia/Dhaka')->startOfDay()->utc();
+            $from = CarbonImmutable::parse((string) $filters['date_from'], $timezone)->startOfDay()->utc();
             $query->where('created_at', '>=', $from);
         }
         if (! empty($filters['date_to'])) {
-            $to = CarbonImmutable::parse((string) $filters['date_to'], 'Asia/Dhaka')->addDay()->startOfDay()->utc();
+            $to = CarbonImmutable::parse((string) $filters['date_to'], $timezone)->addDay()->startOfDay()->utc();
             $query->where('created_at', '<', $to);
         }
     }

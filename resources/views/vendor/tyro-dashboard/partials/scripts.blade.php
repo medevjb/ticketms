@@ -151,7 +151,8 @@
     // User dropdown
     function toggleUserDropdown() {
         const dropdown = document.getElementById('userDropdown');
-        dropdown.classList.toggle('active');
+        const opened = dropdown.classList.toggle('active');
+        dropdown.querySelector('.user-dropdown-btn')?.setAttribute('aria-expanded', String(opened));
     }
 
     // Close dropdown when clicking outside
@@ -159,6 +160,17 @@
         const dropdown = document.getElementById('userDropdown');
         if (dropdown && !dropdown.contains(event.target)) {
             dropdown.classList.remove('active');
+            dropdown.querySelector('.user-dropdown-btn')?.setAttribute('aria-expanded', 'false');
+        }
+    });
+
+    document.addEventListener('keydown', function(event) {
+        const dropdown = document.getElementById('userDropdown');
+        if (event.key === 'Escape' && dropdown?.classList.contains('active')) {
+            dropdown.classList.remove('active');
+            const button = dropdown.querySelector('.user-dropdown-btn');
+            button?.setAttribute('aria-expanded', 'false');
+            button?.focus();
         }
     });
 
@@ -220,7 +232,7 @@
         toast.innerHTML = `
             <div class="toast-icon">${icons[type] || icons.success}</div>
             <div class="toast-content">
-                <p class="toast-message">${message}</p>
+                <p class="toast-message"></p>
             </div>
             <button class="toast-close" onclick="dismissToast(this.closest('.toast'))">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -229,6 +241,8 @@
             </button>
         `;
 
+        toast.querySelector('.toast-message').textContent = message;
+        toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
         container.appendChild(toast);
 
         const autoDismiss = parseInt(container.dataset.autoDismiss || 5000);
@@ -516,3 +530,5 @@
     })();
 </script>
 @endif
+
+@include('admin.confirmation-dialog')

@@ -23,7 +23,7 @@ return new class extends Migration
             $table->text('description');
             $table->string('status', 30)->default('open');
             $table->unsignedBigInteger('sla_policy_id');
-            $table->unsignedBigInteger('calendar_version_id');
+            $table->unsignedBigInteger('business_calendar_id');
             $table->unsignedInteger('sla_target_seconds');
             $table->dateTime('sla_started_at', 6);
             $table->dateTime('sla_due_at', 6)->nullable();
@@ -40,8 +40,8 @@ return new class extends Migration
             $table->timestamps(6);
             $table->foreignId('updated_by')->nullable()->constrained('users')->restrictOnDelete();
             $table->foreignId('deleted_by')->nullable()->constrained('users')->restrictOnDelete();
-            $table->foreign(['sla_policy_id', 'calendar_version_id'], 'ticket_policy_calendar_fk')->references(['id', 'calendar_version_id'])->on('sla_policies')->restrictOnDelete();
-            $table->foreign(['sla_policy_id', 'priority_id', 'sla_target_seconds'], 'ticket_policy_target_fk')->references(['sla_policy_id', 'priority_id', 'target_seconds'])->on('sla_policy_targets')->restrictOnDelete();
+            $table->foreign('sla_policy_id', 'ticket_sla_policy_fk')->references('id')->on('sla_policies')->restrictOnDelete();
+            $table->foreign('business_calendar_id', 'ticket_business_calendar_fk')->references('id')->on('business_calendars')->restrictOnDelete();
             $table->index(['deleted_at', 'customer_id', 'created_at', 'id'], 'ticket_customer_list_idx');
             $table->index(['deleted_at', 'assigned_agent_id', 'status', 'id'], 'ticket_agent_workload_idx');
             $table->index(['deleted_at', 'status', 'created_at', 'id'], 'ticket_status_list_idx');

@@ -191,7 +191,7 @@ it('does not allow a non-administrator to upload a ticket import', function (): 
             'source' => 'crm',
             'file' => UploadedFile::fake()->createWithContent('tickets.csv', "external_id,customer_email,subject,description,priority,category\n"),
         ])
-        ->assertRedirect();
+        ->assertNotFound();
 
     expect(ImportRun::query()->count())->toBe(0);
 });

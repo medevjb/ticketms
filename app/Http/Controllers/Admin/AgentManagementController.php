@@ -9,6 +9,7 @@ use App\Models\AgentProfile;
 use App\Models\User;
 use App\Services\Agents\AgentManagementService;
 use Carbon\CarbonImmutable;
+use HasinHayder\Tyro\Support\TyroAudit;
 use HasinHayder\TyroDashboard\Http\Controllers\BaseController;
 use HasinHayder\TyroDashboard\Support\DashboardRoute;
 use Illuminate\Http\RedirectResponse;
@@ -109,6 +110,21 @@ class AgentManagementController extends BaseController
             report($exception);
 
             return false;
+        }
+    }
+
+    /**
+     * Keep an audit logging failure from interrupting agent management actions.
+     *
+     * @param  array<string, mixed>|null  $oldValues
+     * @param  array<string, mixed>|null  $newValues
+     */
+    protected function auditSafely(string $event, mixed $auditable = null, ?array $oldValues = null, ?array $newValues = null): void
+    {
+        try {
+            TyroAudit::log($event, $auditable, $oldValues, $newValues);
+        } catch (Throwable $exception) {
+            report($exception);
         }
     }
 }

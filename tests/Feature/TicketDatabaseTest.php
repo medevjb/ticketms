@@ -3,34 +3,40 @@
 use App\Enums\MessageVisibility;
 use App\Enums\TicketStatus;
 use App\Models\ActivityEntry;
-use App\Models\CalendarVersion;
+use App\Models\BusinessCalendar;
 use App\Models\Category;
 use App\Models\NotificationDelivery;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\SlaPolicy;
 use App\Models\Ticket;
 use App\Models\TicketAttachment;
-use App\Models\TicketingSetting;
 use App\Models\TicketMessage;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Database\Seeders\TicketingConfigurationSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
-test('ticket relationships retain historical configuration after archival', function () {
+test('ticket relationships retain their configured SLA data', function () {
     $ticket = Ticket::factory()->create();
     $category = $ticket->category;
-    $calendar = $ticket->calendarVersion;
+    $calendar = $ticket->businessCalendar;
 
     $category->delete();
-    $calendar->delete();
-
     expect($ticket->fresh()->category->is($category))->toBeTrue()
-        ->and($ticket->fresh()->calendarVersion->is($calendar))->toBeTrue()
+        ->and($ticket->fresh()->businessCalendar->is($calendar))->toBeTrue()
         ->and($ticket->customer->ownedTickets->contains($ticket))->toBeTrue()
         ->and($ticket->status)->toBe(TicketStatus::Open)
         ->and($ticket->sla_started_at)->toBeInstanceOf(CarbonImmutable::class);
+});
+
+test('activity analytics has an index for action and date range queries', function () {
+    $indexes = Schema::getIndexes('activity_entries');
+
+    expect(collect($indexes)->firstWhere('name', 'activity_action_date_ticket_idx')['columns'] ?? null)
+        ->toBe(['action', 'occurred_at', 'ticket_id']);
 });
 
 test('inactive and archived categories are excluded from available selections', function () {
@@ -71,12 +77,12 @@ test('ticket configuration bootstrap creates approved targets and is idempotent'
     $this->seed(TicketingConfigurationSeeder::class);
     $this->seed(TicketingConfigurationSeeder::class);
 
-    $policy = TicketingSetting::query()->findOrFail(1)->currentSlaPolicy;
+    $policy = SlaPolicy::query()->firstOrFail();
 
-    expect($policy->calendarVersion->timezone)->toBe('Asia/Dhaka')
-        ->and($policy->calendarVersion->windows->pluck('weekday')->sort()->values()->all())->toBe([1, 2, 3, 4, 7])
+    expect(BusinessCalendar::query()->with('windows')->firstOrFail()->timezone)->toBe('Asia/Dhaka')
+        ->and(BusinessCalendar::query()->with('windows')->firstOrFail()->windows->pluck('weekday')->sort()->values()->all())->toBe([1, 2, 3, 4, 7])
         ->and($policy->targets->pluck('target_seconds')->sort()->values()->all())->toBe([7200, 28800, 86400, 172800])
-        ->and(CalendarVersion::query()->count())->toBe(1)
+        ->and(BusinessCalendar::query()->count())->toBe(1)
         ->and(Role::query()->where('is_system', true)->count())->toBe(3);
 });
 

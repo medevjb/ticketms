@@ -5,7 +5,7 @@ use App\Enums\TicketStatus;
 use App\Jobs\DeliverTicketNotification;
 use App\Models\ActivityEntry;
 use App\Models\AgentProfile;
-use App\Models\CalendarVersion;
+use App\Models\BusinessCalendar;
 use App\Models\Category;
 use App\Models\NotificationDelivery;
 use App\Models\Priority;
@@ -14,7 +14,6 @@ use App\Models\SlaPolicy;
 use App\Models\SlaPolicyTarget;
 use App\Models\Ticket;
 use App\Models\TicketEscalation;
-use App\Models\TicketingSetting;
 use App\Models\User;
 use App\Notifications\TicketActivityNotification;
 use App\Services\Tickets\NotificationDeliveryService;
@@ -45,11 +44,10 @@ beforeEach(function (): void {
 
 function ticketForNotificationTesting(User $customer, ?User $agent = null, string $prioritySlug = 'critical'): Ticket
 {
-    $settings = TicketingSetting::query()->findOrFail(1);
-    $policy = SlaPolicy::query()->whereKey($settings->current_sla_policy_id)->firstOrFail();
+    $policy = SlaPolicy::query()->firstOrFail();
     $priority = Priority::query()->where('slug', $prioritySlug)->firstOrFail();
     $target = SlaPolicyTarget::query()->where('sla_policy_id', $policy->getKey())->where('priority_id', $priority->getKey())->firstOrFail();
-    $calendar = CalendarVersion::query()->whereKey($policy->calendar_version_id)->firstOrFail();
+    $calendar = BusinessCalendar::query()->firstOrFail();
     $startedAt = CarbonImmutable::now('UTC')->startOfSecond();
     $projection = app(SlaService::class)->creationProjection($calendar, $startedAt, (int) $target->target_seconds, (int) $policy->warning_percent);
 
@@ -60,7 +58,7 @@ function ticketForNotificationTesting(User $customer, ?User $agent = null, strin
         'category_id' => Category::query()->active()->firstOrFail()->getKey(),
         'priority_id' => $priority->getKey(),
         'sla_policy_id' => $policy->getKey(),
-        'calendar_version_id' => $calendar->getKey(),
+        'business_calendar_id' => $calendar->getKey(),
         'sla_target_seconds' => $target->target_seconds,
         'sla_started_at' => $startedAt,
         'sla_warning_at' => $projection['warning_at'],

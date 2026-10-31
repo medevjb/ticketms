@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'display_timezone' => env('TICKETING_DISPLAY_TIMEZONE', 'Asia/Dhaka'),
     'processing' => [
         'notification_batch_size' => 100,
         'notification_max_attempts' => 5,
@@ -29,18 +30,6 @@ return [
             'png' => ['image/png'],
             'txt' => ['text/plain'],
             'csv' => ['text/plain', 'text/csv', 'application/vnd.ms-excel'],
-        ],
-    ],
-    'bootstrap_users' => [
-        'agent' => [
-            'name' => env('TICKETING_AGENT_NAME'),
-            'email' => env('TICKETING_AGENT_EMAIL'),
-            'password' => env('TICKETING_AGENT_PASSWORD'),
-        ],
-        'customer' => [
-            'name' => env('TICKETING_CUSTOMER_NAME'),
-            'email' => env('TICKETING_CUSTOMER_EMAIL'),
-            'password' => env('TICKETING_CUSTOMER_PASSWORD'),
         ],
     ],
     'agent_invitation_expire_minutes' => (int) env('TICKETING_AGENT_INVITATION_EXPIRE_MINUTES', 1440),

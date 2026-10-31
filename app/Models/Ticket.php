@@ -105,13 +105,13 @@ class Ticket extends Model
     /** @return BelongsTo<SlaPolicy, $this> */
     public function slaPolicy(): BelongsTo
     {
-        return $this->belongsTo(SlaPolicy::class, 'sla_policy_id')->withTrashed();
+        return $this->belongsTo(SlaPolicy::class, 'sla_policy_id');
     }
 
-    /** @return BelongsTo<CalendarVersion, $this> */
-    public function calendarVersion(): BelongsTo
+    /** @return BelongsTo<BusinessCalendar, $this> */
+    public function businessCalendar(): BelongsTo
     {
-        return $this->belongsTo(CalendarVersion::class, 'calendar_version_id')->withTrashed();
+        return $this->belongsTo(BusinessCalendar::class, 'business_calendar_id');
     }
 
     /** @return HasMany<TicketMessage, $this> */

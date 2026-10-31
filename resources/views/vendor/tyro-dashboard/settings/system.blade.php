@@ -28,6 +28,20 @@
     </div>
 </div>
 
+<section class="card" style="margin-bottom:20px"><div class="card-body">
+    <h2 class="section-title">Display timezone</h2>
+    <p class="page-description">Choose the timezone for staff timestamps and ticket date filters. Business calendar schedules and analytics reporting dates retain their configured timezone.</p>
+    @if(auth()->user()->can('users.manage'))
+    <form action="{{ route('dashboard.settings.timezone') }}" method="POST" style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap">
+        @csrf @method('PUT')
+        <div style="flex:1;max-width:360px"><label class="form-label" for="display-timezone">Timezone</label><select id="display-timezone" name="timezone" class="form-select">
+            @foreach(\DateTimeZone::listIdentifiers() as $timezone)<option value="{{ $timezone }}" @selected(config('ticketing.display_timezone', 'Asia/Dhaka') === $timezone)>{{ str_replace('_', ' ', $timezone) }}</option>@endforeach
+        </select></div>
+        <button class="btn btn-secondary" type="submit">Save timezone</button>
+    </form>
+    @endif
+</div></section>
+
 <form id="systemSettingsForm" method="POST" action="{{ route($dashboardRoute::name('settings.system.update')) }}">
     @csrf
 

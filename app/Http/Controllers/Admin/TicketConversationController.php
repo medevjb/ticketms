@@ -45,7 +45,7 @@ class TicketConversationController extends BaseController
                     'visibility' => $message->visibility->value,
                     'author_id' => $message->author_id,
                     'author' => $message->author?->name ?? 'Former user',
-                    'created_at' => $message->created_at?->timezone(config('app.timezone'))->format('d M Y, h:i A'),
+                    'created_at' => $message->created_at?->timezone(config('ticketing.display_timezone', 'Asia/Dhaka'))->format('d M Y, h:i A'),
                     'updated_at' => $message->updated_at?->toIso8601String(),
                     'is_active' => $message->is_active,
                     'can_moderate' => $request->user()->can('messages.moderate'),
@@ -56,6 +56,7 @@ class TicketConversationController extends BaseController
                         'name' => $attachment->original_name,
                         'size' => $attachment->size_bytes,
                         'url' => route('dashboard.ticket-attachments.download', $attachment),
+                        'preview_url' => $attachment->isPreviewableImage() ? route('dashboard.ticket-attachments.preview', $attachment) : null,
                     ])->values(),
                 ],
             ], 201);

@@ -26,12 +26,6 @@ class TicketingSetting extends Model
         ];
     }
 
-    /** @return BelongsTo<SlaPolicy, $this> */
-    public function currentSlaPolicy(): BelongsTo
-    {
-        return $this->belongsTo(SlaPolicy::class, 'current_sla_policy_id')->withTrashed();
-    }
-
     /** @return BelongsTo<User, $this> */
     public function updater(): BelongsTo
     {

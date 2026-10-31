@@ -1,9 +1,11 @@
+import './ticket-sla-countdown';
 import axios from 'axios';
 
 type AttachmentRecord = {
     name: string;
     size: number;
     url: string;
+    preview_url?: string | null;
 };
 
 type MessageRecord = {
@@ -148,7 +150,7 @@ document.addEventListener('submit', async (event) => {
         const response = axios.isAxiosError<{ errors?: Record<string, string[]> }>(error) ? error.response : undefined;
         if (response?.status === 422 && response.data.errors) {
             showErrors(form, response.data.errors);
-            toast('Please correct the highlighted fields and try again.', 'error');
+            toast([...new Set(Object.values(response.data.errors).flat())].join(' '), 'error');
         } else if (response?.status === 409) {
             toast(form.dataset.axiosForm === 'agent-eligibility' ? 'Agent eligibility changed. Reload the page and try again.' : 'This ticket changed while you were working. Reload the page and try again.', 'error');
         } else if (response?.status === 403) {
@@ -220,12 +222,14 @@ function toast(message: string, type: 'success' | 'error'): void {
 
 function clearErrors(form: HTMLFormElement): void {
     form.querySelectorAll('[data-axios-error]').forEach((error) => error.remove());
-    form.querySelectorAll('.is-invalid').forEach((field) => field.classList.remove('is-invalid'));
+    form.querySelectorAll('.is-invalid').forEach((field) => {
+        field.classList.remove('is-invalid');
+        field.removeAttribute('aria-invalid');
+    });
 }
 
 function showErrors(form: HTMLFormElement, errors: Record<string, string[]>): void {
-    Object.entries(errors).forEach(([name, messages]) => {
-        const fieldName = name.split('.')[0] ?? name;
+    Object.keys(errors).forEach((name) => {
         const field = Array.from(form.elements).find((element) => {
             if (!(element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement)) {
                 return false;
@@ -239,13 +243,7 @@ function showErrors(form: HTMLFormElement, errors: Record<string, string[]>): vo
         }
 
         field.classList.add('is-invalid');
-        const error = document.createElement('p');
-        error.dataset.axiosError = fieldName;
-        error.className = form.classList.contains('customer-form') ? 'customer-field-error' : 'form-error';
-        error.setAttribute('role', 'alert');
-        error.textContent = messages[0] ?? 'Check this field and try again.';
-        const wrapper = field.closest('.customer-field-wrap');
-        (wrapper ?? field.parentElement ?? form).append(error);
+        field.setAttribute('aria-invalid', 'true');
     });
 }
 
@@ -283,7 +281,7 @@ function appendAdminMessage(thread: HTMLElement, message: MessageRecord): void {
     const authorName = document.createElement('strong');
     authorName.textContent = message.author;
     const timestamp = document.createElement('span');
-    timestamp.textContent = `${message.created_at} Dhaka time`;
+    timestamp.textContent = `${message.created_at} ${ticketRoot()?.dataset.displayTimezone ?? 'Asia/Dhaka'} time`;
     author.append(authorName, timestamp);
     const tags = document.createElement('div');
     tags.className = 'ticket-message-tags';
@@ -348,6 +346,45 @@ function appendCustomerMessage(thread: HTMLElement, message: MessageRecord): voi
 
 function appendAttachments(container: HTMLElement, attachments: AttachmentRecord[], className = 'ticket-message-attachment'): void {
     attachments.forEach((attachment) => {
+        if (attachment.preview_url) {
+            const preview = document.createElement('a');
+            preview.className = 'conversation-image-preview';
+            preview.href = attachment.preview_url;
+            preview.target = '_blank';
+            preview.rel = 'noopener noreferrer';
+            preview.setAttribute('aria-label', `Open image ${attachment.name}`);
+            const image = document.createElement('img');
+            image.src = attachment.preview_url;
+            image.alt = attachment.name;
+            image.loading = 'lazy';
+            image.decoding = 'async';
+            const caption = document.createElement('span');
+            caption.textContent = 'Open image ↗';
+            caption.setAttribute('aria-hidden', 'true');
+            preview.append(image, caption);
+            const card = document.createElement('figure');
+            card.className = 'conversation-image-card';
+            const footer = document.createElement('figcaption');
+            footer.className = 'conversation-image-footer';
+            const meta = document.createElement('div');
+            meta.className = 'conversation-image-meta';
+            const name = document.createElement('strong');
+            name.textContent = attachment.name;
+            name.title = attachment.name;
+            const size = document.createElement('small');
+            size.textContent = `${Math.ceil(attachment.size / 1024)} KiB`;
+            meta.append(name, size);
+            const download = document.createElement('a');
+            download.className = 'conversation-image-download';
+            download.href = attachment.url;
+            download.title = `Download ${attachment.name}`;
+            download.setAttribute('aria-label', download.title);
+            download.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/></svg>';
+            footer.append(meta, download);
+            card.append(preview, footer);
+            container.append(card);
+            return;
+        }
         const row = document.createElement('div');
         row.className = className;
         const description = document.createElement('span');

@@ -253,8 +253,9 @@ it('atomically unassigns a disabled agent while retaining terminal assignments',
 });
 
 it('only administrators can change agent automatic-assignment eligibility', function (): void {
-    $this->actingAs($this->admin)->get(route('dashboard.ticket-agents.index'))->assertOk();
-    $this->actingAs($this->admin)->patch(route('dashboard.ticket-agents.auto-assignment', $this->agent->getKey()), [
+    $this->actingAs($this->admin)->get(route('dashboard.ticket-agents.index'))->assertRedirectToRoute('dashboard.agents.index');
+    $this->get(route('dashboard.agents.index'))->assertOk()->assertSee('Automatic assignment')->assertSee('Last automatic assignment')->assertDontSee('Assignment overview');
+    $this->actingAs($this->admin)->from(route('dashboard.agents.index'))->patch(route('dashboard.ticket-agents.auto-assignment', $this->agent->getKey()), [
         'operation_key' => (string) Str::uuid(),
         'auto_assignment_enabled' => true,
     ])->assertRedirect();

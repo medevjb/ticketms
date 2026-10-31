@@ -39,7 +39,7 @@ class PriorityController extends BaseController
         $priorities->create($request->user(), (string) $data['name'], (string) $data['slug'], (int) $data['sort_order']);
 
         return to_route('dashboard.priorities.index', ['status' => 'inactive'])
-            ->with('success', 'Priority created as disabled. Add its SLA target to a draft policy before enabling it.');
+            ->with('success', 'Priority created as disabled. Add an SLA target before enabling it.');
     }
 
     public function edit(Priority $priority): View

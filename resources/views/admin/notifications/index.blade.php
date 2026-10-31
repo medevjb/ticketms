@@ -33,11 +33,11 @@
                         @endif
                     </p>
                     <p class="page-description">{{ $data['summary'] ?? 'There is an update on a ticket you can access.' }}</p>
-                    <p class="page-description">{{ $notification->created_at?->timezone('Asia/Dhaka')->format('d M Y, h:i A') }} Dhaka time</p>
+                    <p class="page-description">{{ $notification->created_at?->timezone(config('ticketing.display_timezone', 'Asia/Dhaka'))->format('d M Y, h:i A') }} {{ config('ticketing.display_timezone', 'Asia/Dhaka') }} time</p>
                 </div>
                 <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
                     @if(isset($data['ticket_id']))
-                        <a class="btn btn-secondary" href="{{ route('dashboard.tickets.show', (int) $data['ticket_id']) }}">View ticket</a>
+                        <a class="btn btn-secondary admin-icon-button" href="{{ route('dashboard.tickets.show', (int) $data['ticket_id']) }}" title="View ticket" aria-label="View ticket">@include('admin.action-icon', ['icon' => 'view'])</a>
                     @endif
                     @if($notification->read_at === null)
                         <form method="POST" action="{{ route('dashboard.notifications.read', $notification->id) }}">

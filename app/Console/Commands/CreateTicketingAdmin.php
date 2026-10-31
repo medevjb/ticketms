@@ -12,8 +12,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
-#[Signature('ticketing:make-admin')]
-#[Description('Create the initial admin using the application Spatie role store.')]
+#[Signature('tyro-dashboard:createsuperuser', aliases: ['ticketing:make-admin'])]
+#[Description('Create an administrator using the application role store.')]
 class CreateTicketingAdmin extends Command
 {
     public function handle(): int
@@ -33,17 +33,46 @@ class CreateTicketingAdmin extends Command
             return self::FAILURE;
         }
 
-        if (User::withTrashed()->where('email', $email)->exists()) {
-            $this->error('An account with that email already exists, including archived accounts.');
+        $role = Role::query()->where('name', 'admin')->where('guard_name', 'web')->active()->first();
+        if ($role === null) {
+            $this->error('The application admin role is missing. Run the application seeders first: php artisan db:seed.');
 
             return self::FAILURE;
         }
 
-        $role = Role::query()->where('name', 'admin')->where('guard_name', 'web')->active()->first();
-        if ($role === null) {
-            $this->error('The admin role is missing. Run the database seeders first.');
+        $existingUser = User::withTrashed()->where('email', $email)->first();
+        if ($existingUser !== null) {
+            if ($existingUser->trashed() || ! $existingUser->is_active) {
+                $this->error('This account is archived or disabled. Restore or enable it before granting admin access.');
 
-            return self::FAILURE;
+                return self::FAILURE;
+            }
+
+            if ($existingUser->hasRole($role)) {
+                $this->info("{$existingUser->email} already has admin access.");
+
+                return self::SUCCESS;
+            }
+
+            if (! $this->confirm('This account already exists. Assign the admin role to it?', false)) {
+                $this->line('No changes were made.');
+
+                return self::SUCCESS;
+            }
+
+            DB::transaction(function () use ($existingUser, $role): void {
+                $user = User::query()->whereKey($existingUser->getKey())->lockForUpdate()->firstOrFail();
+                $user->forceFill([
+                    'email_verified_at' => $user->email_verified_at ?? now(),
+                    'authorization_version' => $user->authorization_version + 1,
+                    'remember_token' => null,
+                ])->save();
+                $user->assignRole($role);
+            });
+
+            $this->info("Admin access assigned to {$existingUser->email}.");
+
+            return self::SUCCESS;
         }
 
         while (true) {

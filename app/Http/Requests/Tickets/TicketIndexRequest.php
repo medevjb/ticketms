@@ -28,6 +28,7 @@ class TicketIndexRequest extends FormRequest
             'category_id' => ['nullable', 'integer', 'min:1'],
             'customer_id' => ['nullable', 'integer', 'min:1', Rule::prohibitedIf(! $isAdministrator)],
             'agent_id' => ['nullable', 'integer', 'min:1', Rule::prohibitedIf(! $isAdministrator)],
+            'assignment' => ['nullable', Rule::in(['assigned', 'unassigned'])],
             'sla_state' => ['nullable', 'string', Rule::in(['within', 'approaching', 'breached', 'paused', 'stopped'])],
             'date_from' => ['nullable', 'date_format:Y-m-d'],
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],

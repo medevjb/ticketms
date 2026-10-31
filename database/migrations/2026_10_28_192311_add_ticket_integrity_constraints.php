@@ -12,20 +12,13 @@ return new class extends Migration
         'users' => [
             'user_authorization_version_positive' => 'authorization_version > 0',
         ],
-        'calendar_versions' => [
-            'calendar_version_positive' => 'version_no > 0',
-            'calendar_publication_state' => "publication_state IN ('draft', 'published')",
-            'calendar_publication_time' => "(publication_state = 'draft' AND published_at IS NULL) OR (publication_state = 'published' AND published_at IS NOT NULL)",
-        ],
+        'business_calendars' => [],
         'calendar_windows' => [
             'calendar_weekday_range' => 'weekday BETWEEN 1 AND 7',
             'calendar_window_order' => 'closes_at > opens_at',
         ],
         'sla_policies' => [
-            'sla_version_positive' => 'version_no > 0',
             'sla_warning_percentage' => 'warning_percent BETWEEN 1 AND 99',
-            'sla_publication_state' => "publication_state IN ('draft', 'published')",
-            'sla_publication_time' => "(publication_state = 'draft' AND published_at IS NULL) OR (publication_state = 'published' AND published_at IS NOT NULL)",
         ],
         'sla_policy_targets' => [
             'sla_target_positive' => 'target_seconds > 0',

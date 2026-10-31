@@ -1,0 +1,112 @@
+name: ticketms
+
+x-app: &app
+  build:
+    context: .
+    args:
+      VITE_REVERB_APP_KEY: ticketms-docker-key
+      VITE_REVERB_HOST: localhost
+      VITE_REVERB_PORT: "8081"
+      VITE_REVERB_SCHEME: http
+  env_file:
+    - .env.docker
+  environment: &app-environment
+    APP_ENV: local
+    APP_DEBUG: "true"
+    APP_URL: http://localhost:8088
+    LOG_CHANNEL: stderr
+    DB_CONNECTION: mysql
+    DB_HOST: db
+    DB_PORT: "3306"
+    DB_DATABASE: ticketms
+    DB_USERNAME: ticketms
+    DB_PASSWORD: ticketms-local
+    CACHE_STORE: database
+    SESSION_DRIVER: database
+    QUEUE_CONNECTION: database
+    BROADCAST_CONNECTION: reverb
+    REVERB_APP_ID: ticketms-local
+    REVERB_APP_KEY: ticketms-docker-key
+    REVERB_APP_SECRET: ticketms-docker-secret
+    REVERB_HOST: reverb
+    REVERB_PORT: "8080"
+    REVERB_SCHEME: http
+    REVERB_ALLOWED_ORIGINS: localhost,127.0.0.1
+    REVERB_SERVER_HOST: 0.0.0.0
+    REVERB_SERVER_PORT: "8080"
+    MAIL_MAILER: log
+  volumes:
+    - ticketms-storage:/var/www/html/storage
+  restart: unless-stopped
+  init: true
+
+services:
+  app:
+    <<: *app
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8088:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "php -r '$$status = @file_get_contents(\"http://127.0.0.1:8000/up\"); exit($$status === false ? 1 : 0);'"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  queue:
+    <<: *app
+    command:
+      - php
+      - artisan
+      - queue:work
+      - database
+      - --queue=imports,sla,notifications-database,notifications-mail,default
+      - --sleep=1
+      - --tries=3
+      - --timeout=120
+    depends_on:
+      db:
+        condition: service_healthy
+
+  scheduler:
+    <<: *app
+    command: ["php", "artisan", "schedule:work"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  reverb:
+    <<: *app
+    command:
+      - php
+      - artisan
+      - reverb:start
+      - --host=0.0.0.0
+      - --port=8080
+    ports:
+      - "8081:8080"
+
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: ticketms
+      MYSQL_USER: ticketms
+      MYSQL_PASSWORD: ticketms-local
+      MYSQL_ROOT_PASSWORD: ticketms-root-local
+    volumes:
+      - ticketms-mysql:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD-SHELL", 'mysqladmin ping -h 127.0.0.1 -uroot -p"$${MYSQL_ROOT_PASSWORD}" --silent']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  ticketms-mysql:
+  ticketms-storage:

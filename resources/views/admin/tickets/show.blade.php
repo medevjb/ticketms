@@ -166,6 +166,16 @@
         .ticket-detail-page .ticket-conversation-body .ticket-message-public .ticket-message-moderation{justify-content:flex-start}
         .ticket-detail-page .ticket-conversation-body .ticket-message-from-staff .ticket-message-moderation{justify-content:flex-end}
     }
+    .ticket-message.ticket-initial-issue { background:color-mix(in srgb,var(--info) 7%,var(--card)); border:1px solid color-mix(in srgb,var(--info) 25%,var(--border)); border-left:3px solid var(--info); }
+    .ticket-initial-issue-title { margin:12px 0 8px; font-size:13px; font-weight:700; color:var(--foreground); }
+    .ticket-initial-issue-tag { color:var(--info); background:color-mix(in srgb,var(--info) 12%,var(--card)); }
+    html.dark .ticket-message.ticket-initial-issue { background:color-mix(in srgb,var(--info) 9%,var(--card)); border-color:color-mix(in srgb,var(--info) 30%,var(--border)); border-left-color:var(--info); }
+    .ticket-agent-facts { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .ticket-detail-heading-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .ticket-detail-heading-actions form { margin:0; }
+    .ticket-detail-page .ticket-conversation-body { max-height: min(65vh, 640px); overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; }
+    .ticket-conversation-body:focus-visible { outline:2px solid var(--ring); outline-offset:-3px; }
+    @media(max-width:600px) { .ticket-agent-facts { grid-template-columns:1fr; } }
 </style>
 @endpush
 @section('content')
@@ -173,25 +183,37 @@
 @php($statusLabels = ['open'=>'Open','in_progress'=>'In Progress','waiting_customer'=>'Waiting for Customer','resolved'=>'Resolved','closed'=>'Closed'])
 @php($slaStateLabels = ['within'=>'On track','approaching'=>'Approaching target','breached'=>'Target breached','paused'=>'Paused','stopped'=>'Stopped'])
 @php($remainingSeconds = max(0, (int) $sla['remaining_seconds']))
-<div class="ticket-detail-page" data-ticket-status="{{ $ticket->status->value }}" data-customer-id="{{ $ticket->customer_id }}" data-current-user-id="{{ auth()->id() }}">
+@php($canStart = collect($transitions)->contains(fn ($transition) => $transition->value === 'start'))
+@php($secondaryTransitions = array_values(array_filter($transitions, fn ($transition) => $transition->value !== 'start')))
+<div class="ticket-detail-page" data-display-timezone="{{ config('ticketing.display_timezone', 'Asia/Dhaka') }}" data-ticket-status="{{ $ticket->status->value }}" data-customer-id="{{ $ticket->customer_id }}" data-current-user-id="{{ auth()->id() }}">
     <header class="ticket-detail-heading">
         <div class="ticket-detail-heading-main">
             <div class="ticket-detail-eyebrow">Support ticket <span>{{ $ticket->number }}</span></div>
             <h1>{{ $ticket->subject }}</h1>
-            <p>Created {{ $ticket->created_at?->timezone('Asia/Dhaka')->format('d M Y, h:i A') }} Dhaka time · by {{ $ticket->creator?->name ?? 'A former user' }}</p>
+            <p>Created {{ $ticket->created_at?->timezone(config('ticketing.display_timezone', 'Asia/Dhaka'))->format('d M Y, h:i A') }} {{ config('ticketing.display_timezone', 'Asia/Dhaka') }} time · by {{ $ticket->creator?->name ?? 'A former user' }}</p>
         </div>
-        @if($mayEditContent)<div class="ticket-detail-heading-actions"><a class="btn btn-secondary" href="{{ route('dashboard.tickets.edit', $ticket) }}">Edit ticket details</a></div>@endif
+        @if($mayEditContent || $canStart)<div class="ticket-detail-heading-actions">
+            @if($canStart)
+                <form method="POST" action="{{ route('dashboard.tickets.transition', $ticket) }}">
+                    @csrf @method('PATCH')
+                    <input type="hidden" name="transition" value="start">
+                    <input type="hidden" name="operation_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
+                    <input type="hidden" name="lock_version" value="{{ $ticket->lock_version }}">
+                    <button type="submit" class="btn btn-primary">Start work</button>
+                </form>
+            @endif
+            @if($mayEditContent)<a class="btn btn-secondary admin-icon-button" href="{{ route('dashboard.tickets.edit', $ticket) }}" title="Edit ticket details" aria-label="Edit ticket details">@include('admin.action-icon', ['icon' => 'edit'])</a>@endif</div>@endif
     </header>
 
     @if(!$ticket->is_active)
         <div class="ticket-detail-disabled" role="status"><strong>Disabled ticket</strong><span>This ticket is read-only. Its SLA continues unless the ticket is waiting for the customer or resolved.</span></div>
     @endif
 
-    <div class="ticket-detail-facts" aria-label="Ticket summary">
+    <div class="ticket-detail-facts {{ !$isAdmin ? 'ticket-agent-facts' : '' }}" aria-label="Ticket summary">
         <div class="ticket-fact"><span class="ticket-fact-icon" aria-hidden="true">●</span><div class="ticket-fact-copy"><span class="ticket-fact-label">Status</span><span class="ticket-fact-value"><span class="status-badge ticket-status-{{ $ticket->status->value }}">{{ $statusLabels[$ticket->status->value] }}</span></span></div></div>
         <div class="ticket-fact"><span class="ticket-fact-icon" aria-hidden="true">↗</span><div class="ticket-fact-copy"><span class="ticket-fact-label">Priority</span><span class="ticket-fact-value">{{ $ticket->priority?->name ?? 'Not set' }}</span><span class="ticket-fact-sub">{{ $ticket->category?->name ?? 'Uncategorized' }}</span></div></div>
-        <div class="ticket-fact"><span class="ticket-fact-icon" aria-hidden="true">◎</span><div class="ticket-fact-copy"><span class="ticket-fact-label">Assigned agent</span><span class="ticket-fact-value">{{ $ticket->assignedAgent?->name ?? 'Unassigned' }}</span></div></div>
-        <div class="ticket-fact"><span class="ticket-fact-icon" aria-hidden="true">◷</span><div class="ticket-fact-copy"><span class="ticket-fact-label">SLA</span><span class="ticket-fact-value">{{ $slaStateLabels[$sla['state']] ?? str($sla['state'])->headline() }}</span>@if($sla['due_at'])<span class="ticket-fact-sub">Due {{ $sla['due_at']->timezone('Asia/Dhaka')->format('d M, h:i A') }}</span>@elseif($ticket->status->value === 'waiting_customer')<span class="ticket-fact-sub">Paused for customer</span>@endif</div></div>
+        @if($isAdmin)<div class="ticket-fact"><span class="ticket-fact-icon" aria-hidden="true">◎</span><div class="ticket-fact-copy"><span class="ticket-fact-label">Assigned agent</span><span class="ticket-fact-value">{{ $ticket->assignedAgent?->name ?? 'Unassigned' }}</span></div></div>@endif
+        <div class="ticket-fact"><span class="ticket-fact-icon" aria-hidden="true">◷</span><div class="ticket-fact-copy"><span class="ticket-fact-label">SLA</span><span class="ticket-fact-value">{{ $slaStateLabels[$sla['state']] ?? str($sla['state'])->headline() }}</span>@if($sla['due_at'])<span class="ticket-fact-sub">Due {{ $sla['due_at']->timezone(config('ticketing.display_timezone', 'Asia/Dhaka'))->format('d M, h:i A') }}</span>@elseif($ticket->status->value === 'waiting_customer')<span class="ticket-fact-sub">Paused for customer</span>@endif</div></div>
     </div>
 
     <div class="ticket-detail-layout">
@@ -238,34 +260,34 @@
             @endif
 
             <section class="card ticket-panel">
-                <div class="ticket-panel-heading"><div><h2>Resolution SLA</h2><p>Business time in Dhaka timezone</p></div></div>
-                <div class="ticket-sidebar-section">
-                    <div class="ticket-sidebar-value ticket-sla-state ticket-sla-{{ $sla['state'] }}"><span class="ticket-sla-dot"></span>{{ $slaStateLabels[$sla['state']] ?? str($sla['state'])->headline() }}</div>
+                <div class="ticket-panel-heading"><div><h2>Resolution SLA</h2><p>Business calendar: {{ $ticket->businessCalendar?->timezone ?? 'Asia/Dhaka' }}</p></div></div>
+                <div class="ticket-sidebar-section" data-sla-countdown="{{ json_encode($sla) }}" data-sla-ticket="{{ $ticket->id }}">
+                    <div class="ticket-sidebar-value ticket-sla-state ticket-sla-{{ $sla['state'] }}"><span class="ticket-sla-dot"></span><span data-sla-status>{{ $slaStateLabels[$sla['state']] ?? str($sla['state'])->headline() }}</span></div>
+                    <div class="ticket-sla-remaining" data-sla-clock role="timer">{{ sprintf('%02d:%02d:%02d', intdiv($remainingSeconds, 3600), intdiv($remainingSeconds % 3600, 60), $remainingSeconds % 60) }}</div>
+                    <p class="page-description" data-sla-clock-note>{{ $sla['state'] === 'paused' ? 'Paused while waiting for the customer' : ($sla['state'] === 'stopped' ? 'Timer stopped' : ($sla['state'] === 'breached' ? 'SLA target breached' : ($sla['counting_until'] ? 'Business time remaining · live' : 'Outside business hours'))) }}</p>
                     @if($sla['state'] === 'paused')
-                        <div class="ticket-sla-remaining">{{ intdiv($remainingSeconds, 3600) }}h {{ intdiv($remainingSeconds % 3600, 60) }}m left</div>
-                        <p class="page-description">Paused since {{ $ticket->sla_paused_at?->timezone('Asia/Dhaka')->format('d M Y, h:i A') }}. The clock resumes when the customer replies.</p>
+                        <p class="page-description">Paused since {{ $ticket->sla_paused_at?->timezone(config('ticketing.display_timezone', 'Asia/Dhaka'))->format('d M Y, h:i A') }}. The clock resumes when the customer replies.</p>
                     @elseif($sla['state'] === 'stopped')
                         <p class="page-description">The resolution timer stopped when the ticket was resolved or closed.</p>
                     @else
-                        <div class="ticket-sla-remaining">{{ intdiv($remainingSeconds, 3600) }}h {{ intdiv($remainingSeconds % 3600, 60) }}m left</div>
-                        @if($sla['due_at'])<p class="page-description">Due {{ $sla['due_at']->timezone('Asia/Dhaka')->format('D, d M Y · h:i A') }}</p>@endif
+                        @if($sla['due_at'])<p class="page-description">Due {{ $sla['due_at']->timezone(config('ticketing.display_timezone', 'Asia/Dhaka'))->format('D, d M Y · h:i A') }}</p>@endif
                     @endif
-                    @if($ticket->first_breached_at)<p class="page-description">First breached {{ $ticket->first_breached_at->timezone('Asia/Dhaka')->format('d M Y, h:i A') }} Dhaka time.</p>@endif
+                    @if($ticket->first_breached_at)<p class="page-description">First breached {{ $ticket->first_breached_at->timezone(config('ticketing.display_timezone', 'Asia/Dhaka'))->format('d M Y, h:i A') }} {{ config('ticketing.display_timezone', 'Asia/Dhaka') }} time.</p>@endif
                 </div>
             </section>
 
-            @if(($mayChangePriority && !in_array($ticket->status->value, ['resolved','closed'], true)) || ($mayAssign && $ticket->is_active && !in_array($ticket->status->value, ['resolved','closed'], true)) || count($transitions) > 0)
+            @if(($mayChangePriority && !in_array($ticket->status->value, ['resolved','closed'], true)) || ($mayAssign && $ticket->is_active && !in_array($ticket->status->value, ['resolved','closed'], true)) || count($secondaryTransitions) > 0)
                 <section class="card ticket-panel ticket-actions-panel">
                     <div class="ticket-panel-heading"><div><h2>Manage ticket</h2><p>Changes are recorded in ticket history</p></div></div>
                     @if($mayChangePriority && !in_array($ticket->status->value, ['resolved','closed'], true))
-                        <form method="POST" action="{{ route('dashboard.tickets.priority', $ticket) }}" class="ticket-action-group">@csrf @method('PATCH')<input type="hidden" name="operation_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}"><input type="hidden" name="lock_version" value="{{ $ticket->lock_version }}"><h3>Change priority</h3><label class="form-label" for="priority_id">Priority</label><select id="priority_id" name="priority_id" class="form-input" required>@foreach($priorities as $priority)<option value="{{ $priority->id }}" @selected($priority->id === $ticket->priority_id)>{{ $priority->name }}</option>@endforeach</select>@error('priority_id')<p class="form-error" role="alert">{{ $message }}</p>@enderror<p>The original SLA policy is retained; only its target and deadline are recalculated.</p><button class="btn btn-secondary" type="submit">Update priority</button></form>
+                        <form method="POST" action="{{ route('dashboard.tickets.priority', $ticket) }}" class="ticket-action-group">@csrf @method('PATCH')<input type="hidden" name="operation_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}"><input type="hidden" name="lock_version" value="{{ $ticket->lock_version }}"><h3>Change priority</h3><label class="form-label" for="priority_id">Priority</label><select id="priority_id" name="priority_id" class="form-input" required>@foreach($priorities as $priority)<option value="{{ $priority->id }}" @selected($priority->id === $ticket->priority_id)>{{ $priority->name }}</option>@endforeach</select><p>The original SLA policy is retained; only its target and deadline are recalculated.</p><button class="btn btn-secondary" type="submit">Update priority</button></form>
                     @endif
                     @if($mayAssign && $ticket->is_active && !in_array($ticket->status->value, ['resolved','closed'], true))
-                        <div class="ticket-action-group"><h3>Assignment</h3>@if($assignableAgents->isNotEmpty())<form method="POST" action="{{ route('dashboard.tickets.assignment', $ticket) }}" class="ticket-transition-form">@csrf @method('PATCH')<input type="hidden" name="operation_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}"><input type="hidden" name="lock_version" value="{{ $ticket->lock_version }}"><label class="form-label" for="agent_id">Assign to agent</label><select id="agent_id" name="agent_id" class="form-input" required><option value="">Select an agent</option>@foreach($assignableAgents as $agentProfile)<option value="{{ $agentProfile->user_id }}" @selected((int) $ticket->assigned_agent_id === (int) $agentProfile->user_id)>{{ $agentProfile->user?->name }} · {{ $agentProfile->user?->email }}</option>@endforeach</select>@error('agent_id')<p class="form-error" role="alert">{{ $message }}</p>@enderror<p>Assignment does not change status or reset the SLA.</p><button class="btn btn-secondary" type="submit">Save assignment</button></form>@else<p>No active agents are available for assignment.</p>@endif</div>
+                        <div class="ticket-action-group"><h3>Assignment</h3>@if($assignableAgents->isNotEmpty())<form method="POST" action="{{ route('dashboard.tickets.assignment', $ticket) }}" class="ticket-transition-form">@csrf @method('PATCH')<input type="hidden" name="operation_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}"><input type="hidden" name="lock_version" value="{{ $ticket->lock_version }}"><label class="form-label" for="agent_id">Assign to agent</label><select id="agent_id" name="agent_id" class="form-input" required><option value="">Select an agent</option>@foreach($assignableAgents as $agentProfile)<option value="{{ $agentProfile->user_id }}" @selected((int) $ticket->assigned_agent_id === (int) $agentProfile->user_id)>{{ $agentProfile->user?->name }} · {{ $agentProfile->user?->email }}</option>@endforeach</select><p>Assignment does not change status or reset the SLA.</p><button class="btn btn-secondary" type="submit">Save assignment</button></form>@else<p>No active agents are available for assignment.</p>@endif</div>
                     @endif
-                    @if(count($transitions) > 0)
+                    @if(count($secondaryTransitions) > 0)
                         <div class="ticket-action-group"><h3>Update status</h3>
-                            @foreach($transitions as $transition)
+                            @foreach($secondaryTransitions as $transition)
                                 <form method="POST" enctype="multipart/form-data" action="{{ route('dashboard.tickets.transition', $ticket) }}" class="ticket-transition-form">
                                     @csrf
                                     @method('PATCH')
@@ -276,17 +298,13 @@
                                     @if(in_array($transition->value, ['wait', 'resolve', 'reopen'], true))
                                         <label class="form-label" for="message-{{ $transition->value }}">{{ $transition->value === 'wait' ? 'Explain what you need from the customer' : 'Resolution summary for the customer' }}</label>
                                         <textarea id="message-{{ $transition->value }}" name="public_message" rows="3" required minlength="5" maxlength="20000" @class(['form-input', 'is-invalid' => $errors->has('public_message')])></textarea>
-                                        @error('public_message')
-                                            <p class="form-error" role="alert">{{ $message }}</p>
-                                        @enderror
+
                                     @endif
 
                                     @if($transition->value === 'reopen')
                                         <label class="form-label" for="reason-reopen">Reason for reopening</label>
                                         <textarea id="reason-reopen" name="reason" rows="3" required minlength="5" maxlength="500" @class(['form-input', 'is-invalid' => $errors->has('reason')])></textarea>
-                                        @error('reason')
-                                            <p class="form-error" role="alert">{{ $message }}</p>
-                                        @enderror
+
                                     @endif
 
                                     @if(in_array($transition->value, ['wait', 'resolve', 'reopen'], true))

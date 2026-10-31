@@ -301,7 +301,7 @@ test('administrator retains administration navigation on ticket pages', function
         ->assertSee('Ticket imports');
 });
 
-test('landing page is public and sends signed-in users to their role-specific dashboard', function () {
+test('landing page is public and shows signed-in customers their dashboard link', function () {
     $this->get('/')
         ->assertInertia(fn ($page) => $page
             ->component('welcome')
@@ -312,7 +312,10 @@ test('landing page is public and sends signed-in users to their role-specific da
 
     $this->actingAs($user)
         ->get('/')
-        ->assertRedirect(route('customer.dashboard'));
+        ->assertInertia(fn ($page) => $page
+            ->component('welcome')
+            ->where('dashboardUrl', route('customer.dashboard'))
+            ->where('isCustomerAccount', true));
 });
 
 test('successful login sends every configured role to the role-aware Tyro dashboard', function (string $roleName) {

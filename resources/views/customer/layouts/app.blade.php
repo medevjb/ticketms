@@ -9,7 +9,7 @@
     @vite(['resources/css/app.css', 'resources/css/customer-portal.css'])
     @stack('styles')
 </head>
-<body class="customer-app">
+<body class="customer-app" data-realtime-user-id="{{ auth()->id() }}">
     <header class="customer-topbar">
         <div class="customer-topbar-inner">
             <a class="customer-brand" href="{{ route('customer.dashboard') }}">
@@ -42,8 +42,10 @@
     <main class="customer-main">
         @yield('content')
     </main>
+    <div class="customer-realtime-announcement" data-live-announcement role="status" aria-live="polite"></div>
     <footer class="customer-footer"><div class="customer-footer-inner"><span>© {{ now()->year }} {{ config('app.name') }} · Support that keeps you moving.</span><a href="{{ route('home') }}">Support home</a></div></footer>
     @stack('scripts')
+    @vite('resources/js/customer-realtime.ts')
     <script>
         document.addEventListener('click', (event) => {
             document.querySelectorAll('[data-account-menu][open]').forEach((menu) => {
@@ -57,12 +59,23 @@
             });
         });
     </script>
-    @if(session('success') || $errors->any())
-        <div class="customer-toast {{ $errors->any() ? 'customer-toast-error' : '' }}" role="{{ $errors->any() ? 'alert' : 'status' }}" aria-live="{{ $errors->any() ? 'assertive' : 'polite' }}" id="customer-toast">
-            <span>{{ session('success') ?: 'Please correct the highlighted fields in the form.' }}</span>
+    @php
+        $toastMessages = [];
+        foreach (['success', 'error', 'warning', 'info'] as $type) {
+            if (session($type)) {
+                $toastMessages[] = session($type);
+            }
+        }
+        $toastMessages = array_values(array_unique(array_merge($toastMessages, $errors->all())));
+        $hasToastError = $errors->any() || session('error');
+    @endphp
+    @if($toastMessages !== [])
+        <div class="customer-toast {{ $hasToastError ? 'customer-toast-error' : '' }}" role="{{ $hasToastError ? 'alert' : 'status' }}" aria-live="{{ $hasToastError ? 'assertive' : 'polite' }}" id="customer-toast">
+            <div>@foreach($toastMessages as $message)<p style="margin:0">{{ $message }}</p>@endforeach</div>
             <button type="button" aria-label="Dismiss notification" onclick="document.getElementById('customer-toast').remove()">×</button>
         </div>
         <script>window.setTimeout(() => document.getElementById('customer-toast')?.remove(), 6500);</script>
     @endif
+@include('admin.confirmation-dialog')
 </body>
 </html>

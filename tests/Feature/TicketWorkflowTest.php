@@ -3,8 +3,8 @@
 use App\Enums\TicketStatus;
 use App\Enums\TicketTransition;
 use App\Models\ActivityEntry;
+use App\Models\BusinessCalendar;
 use App\Models\CalendarHoliday;
-use App\Models\CalendarVersion;
 use App\Models\CalendarWindow;
 use App\Models\Category;
 use App\Models\NotificationDelivery;
@@ -13,13 +13,14 @@ use App\Models\Role;
 use App\Models\SlaPolicy;
 use App\Models\SlaPolicyTarget;
 use App\Models\Ticket;
-use App\Models\TicketingSetting;
 use App\Models\TicketSlaInterval;
 use App\Models\User;
 use App\Services\Tickets\SlaService;
+use App\Services\Tickets\TicketService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\AuthorizationPermissionSeeder;
 use Database\Seeders\TicketingConfigurationSeeder;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -39,11 +40,10 @@ beforeEach(function (): void {
 
 function ticketForWorkflow(User $customer, ?User $agent = null, string $prioritySlug = 'high'): Ticket
 {
-    $settings = TicketingSetting::query()->findOrFail(1);
-    $policy = SlaPolicy::query()->whereKey($settings->current_sla_policy_id)->firstOrFail();
+    $policy = SlaPolicy::query()->firstOrFail();
     $priority = Priority::query()->where('slug', $prioritySlug)->firstOrFail();
     $target = SlaPolicyTarget::query()->where('sla_policy_id', $policy->getKey())->where('priority_id', $priority->getKey())->firstOrFail();
-    $calendar = CalendarVersion::query()->whereKey($policy->calendar_version_id)->firstOrFail();
+    $calendar = BusinessCalendar::query()->firstOrFail();
     $startedAt = CarbonImmutable::now('UTC')->startOfSecond();
     $projection = app(SlaService::class)->creationProjection($calendar, $startedAt, (int) $target->target_seconds, (int) $policy->warning_percent);
 
@@ -54,7 +54,7 @@ function ticketForWorkflow(User $customer, ?User $agent = null, string $priority
         'category_id' => Category::query()->active()->firstOrFail()->getKey(),
         'priority_id' => $priority->getKey(),
         'sla_policy_id' => $policy->getKey(),
-        'calendar_version_id' => $calendar->getKey(),
+        'business_calendar_id' => $calendar->getKey(),
         'sla_target_seconds' => $target->target_seconds,
         'sla_started_at' => $startedAt,
         'sla_warning_at' => $projection['warning_at'],
@@ -106,6 +106,22 @@ it('rate limits ticket creation per authenticated actor', function (): void {
     }
 
     $this->post(route('customer.tickets.store'), [])->assertStatus(429);
+});
+
+it('searches verified customers and caps the ticket-creation options at fifty', function (): void {
+    $customers = collect(range(0, 50))->map(fn (int $index): User => User::factory()->create([
+        'name' => sprintf('Bounded Customer %03d', $index),
+        'email' => sprintf('bounded-customer-%03d@example.test', $index),
+    ]));
+    $role = Role::query()->where('name', 'customer')->firstOrFail();
+    $customers->each(fn (User $customer) => $customer->assignRole($role));
+
+    $this->actingAs($this->admin)
+        ->get(route('dashboard.tickets.create', ['customer_search' => 'Bounded Customer']))
+        ->assertOk()
+        ->assertSee('Up to 50 matching customers are shown.')
+        ->assertSee('Bounded Customer 000')
+        ->assertDontSee('Bounded Customer 050');
 });
 
 it('reuses an identical create operation and rejects reuse with a changed payload', function (): void {
@@ -301,7 +317,7 @@ it('recalculates the original SLA budget on priority change without changing the
     $critical = Priority::query()->where('slug', 'critical')->firstOrFail();
 
     $this->travel(1)->hours();
-    $this->actingAs($this->agent)->withHeaders(['Accept' => 'application/json'])->post(route('dashboard.tickets.priority', $ticket->id), [
+    $this->actingAs($this->admin)->withHeaders(['Accept' => 'application/json'])->post(route('dashboard.tickets.priority', $ticket->id), [
         '_method' => 'PATCH',
         'operation_key' => (string) Str::uuid(),
         'lock_version' => 1,
@@ -319,10 +335,10 @@ it('recalculates the original SLA budget on priority change without changing the
 });
 
 it('calculates business deadlines across weekends and configured holidays', function (): void {
-    $calendar = CalendarVersion::factory()->published()->create();
+    $calendar = BusinessCalendar::factory()->create();
     foreach ([1, 2, 3, 4, 7] as $weekday) {
         CalendarWindow::factory()->create([
-            'calendar_version_id' => $calendar->id,
+            'business_calendar_id' => $calendar->id,
             'weekday' => $weekday,
             'opens_at' => '09:00:00',
             'closes_at' => '18:00:00',
@@ -336,7 +352,7 @@ it('calculates business deadlines across weekends and configured holidays', func
         ->and($projection['due_at']->timezone('Asia/Dhaka')->format('Y-m-d H:i'))->toBe('2026-11-01 10:00');
 
     CalendarHoliday::factory()->create([
-        'calendar_version_id' => $calendar->id,
+        'business_calendar_id' => $calendar->id,
         'holiday_date' => '2026-11-01',
         'name' => 'Test holiday',
     ]);
@@ -424,4 +440,45 @@ it('archives only closed tickets and restores them disabled', function (): void 
     ])->assertRedirect();
 
     expect($archivedTicket->fresh()->trashed())->toBeFalse()->and($archivedTicket->fresh()->is_active)->toBeFalse();
+});
+
+it('places start work above the conversation and keeps priority management administrator only', function (): void {
+    $ticket = ticketForWorkflow($this->customer, $this->agent, 'high');
+    $originalPriority = $ticket->priority_id;
+    $critical = Priority::query()->where('slug', 'critical')->firstOrFail();
+
+    $this->actingAs($this->agent)->get(route('dashboard.tickets.show', $ticket))
+        ->assertOk()->assertSeeInOrder(['Start work', 'Conversation'])
+        ->assertDontSee('Assigned agent')->assertDontSee('Change priority')->assertDontSee('Update priority');
+    $this->patch(route('dashboard.tickets.priority', $ticket), [
+        'priority_id' => $critical->id, 'operation_key' => (string) Str::uuid(), 'lock_version' => $ticket->lock_version,
+    ])->assertForbidden();
+    expect($ticket->fresh()->priority_id)->toBe($originalPriority);
+    expect(fn () => app(TicketService::class)->changePriority(
+        $this->agent, $ticket->id, $critical->id, $ticket->lock_version, (string) Str::uuid(),
+    ))->toThrow(AuthorizationException::class);
+
+    $this->patch(route('dashboard.tickets.transition', $ticket), [
+        'transition' => 'start', 'operation_key' => (string) Str::uuid(), 'lock_version' => $ticket->lock_version,
+    ])->assertRedirect();
+    expect($ticket->fresh()->status)->toBe(TicketStatus::InProgress);
+    $this->get(route('dashboard.tickets.show', $ticket))->assertOk()->assertDontSee('Start work');
+    $this->actingAs($this->admin)->get(route('dashboard.tickets.show', $ticket))
+        ->assertOk()->assertSee('Assigned agent')->assertSee('Change priority');
+});
+
+it('provides a live business-time countdown that stops outside hours and while waiting', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-11-01 10:00:00', 'Asia/Dhaka'));
+    $ticket = ticketForWorkflow($this->customer, $this->agent, 'high');
+    $first = $this->actingAs($this->agent)->getJson(route('dashboard.tickets.sla', $ticket))->assertOk();
+    expect($first->json('counting_until'))->not->toBeNull();
+    $remaining = $first->json('remaining_seconds');
+    $this->travel(10)->seconds();
+    $this->getJson(route('dashboard.tickets.sla', $ticket))->assertOk()->assertJsonPath('remaining_seconds', $remaining - 10);
+    $this->travelTo(CarbonImmutable::parse('2026-11-01 18:01:00', 'Asia/Dhaka'));
+    $this->getJson(route('dashboard.tickets.sla', $ticket))->assertOk()->assertJsonPath('counting_until', null);
+
+    $ticket->forceFill(['status' => TicketStatus::WaitingForCustomer, 'sla_paused_at' => now()])->save();
+    $this->getJson(route('dashboard.tickets.sla', $ticket))->assertOk()->assertJsonPath('state', 'paused')->assertJsonPath('counting_until', null);
+    $this->actingAs($this->otherCustomer)->getJson(route('dashboard.tickets.sla', $ticket))->assertNotFound();
 });

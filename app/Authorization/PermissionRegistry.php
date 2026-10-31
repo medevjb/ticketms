@@ -19,7 +19,7 @@ class PermissionRegistry
         ],
         'agent' => [
             'tickets.create', 'tickets.view', 'tickets.search', 'tickets.start', 'tickets.wait',
-            'tickets.resume', 'tickets.resolve', 'tickets.change_priority', 'tickets.change_category',
+            'tickets.resume', 'tickets.resolve', 'tickets.change_category',
             'tickets.claim', 'tickets.reply_public', 'tickets.attach', 'tickets.note_internal',
             'tickets.audit_view', 'analytics.view', 'notifications.view', 'notifications.mark_read',
         ],

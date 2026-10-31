@@ -59,22 +59,16 @@ return new class extends Migration
             $table->foreignId('deleted_by')->nullable()->constrained('users')->restrictOnDelete();
         });
 
-        Schema::create('calendar_versions', function (Blueprint $table): void {
+        Schema::create('business_calendars', function (Blueprint $table): void {
             $table->engine('InnoDB');
             $table->charset('utf8mb4');
             $table->collation('utf8mb4_0900_ai_ci');
             $table->id();
-            $table->unsignedInteger('version_no')->unique();
             $table->string('name', 100);
             $table->string('timezone', 64)->default('Asia/Dhaka');
-            $table->string('publication_state', 20)->default('draft');
-            $table->dateTime('published_at', 6)->nullable();
-            $table->boolean('is_active')->default(true);
-            $table->softDeletes('deleted_at', 6);
             $table->timestamps(6);
             $table->foreignId('created_by')->nullable()->constrained('users')->restrictOnDelete();
             $table->foreignId('updated_by')->nullable()->constrained('users')->restrictOnDelete();
-            $table->foreignId('deleted_by')->nullable()->constrained('users')->restrictOnDelete();
         });
 
         Schema::create('calendar_windows', function (Blueprint $table): void {
@@ -82,11 +76,11 @@ return new class extends Migration
             $table->charset('utf8mb4');
             $table->collation('utf8mb4_0900_ai_ci');
             $table->id();
-            $table->foreignId('calendar_version_id')->constrained('calendar_versions')->restrictOnDelete();
+            $table->foreignId('business_calendar_id')->constrained('business_calendars')->cascadeOnDelete();
             $table->unsignedTinyInteger('weekday');
             $table->time('opens_at');
             $table->time('closes_at');
-            $table->unique(['calendar_version_id', 'weekday'], 'calendar_window_day_uq');
+            $table->unique(['business_calendar_id', 'weekday'], 'calendar_window_day_uq');
         });
 
         Schema::create('calendar_holidays', function (Blueprint $table): void {
@@ -94,10 +88,10 @@ return new class extends Migration
             $table->charset('utf8mb4');
             $table->collation('utf8mb4_0900_ai_ci');
             $table->id();
-            $table->foreignId('calendar_version_id')->constrained('calendar_versions')->restrictOnDelete();
+            $table->foreignId('business_calendar_id')->constrained('business_calendars')->cascadeOnDelete();
             $table->date('holiday_date');
             $table->string('name', 100);
-            $table->unique(['calendar_version_id', 'holiday_date'], 'calendar_holiday_date_uq');
+            $table->unique(['business_calendar_id', 'holiday_date'], 'calendar_holiday_date_uq');
         });
 
         Schema::create('sla_policies', function (Blueprint $table): void {
@@ -105,19 +99,11 @@ return new class extends Migration
             $table->charset('utf8mb4');
             $table->collation('utf8mb4_0900_ai_ci');
             $table->id();
-            $table->unsignedInteger('version_no')->unique();
             $table->string('name', 100);
-            $table->foreignId('calendar_version_id')->constrained('calendar_versions')->restrictOnDelete();
             $table->unsignedTinyInteger('warning_percent')->default(80);
-            $table->string('publication_state', 20)->default('draft');
-            $table->dateTime('published_at', 6)->nullable();
-            $table->boolean('is_active')->default(true);
-            $table->softDeletes('deleted_at', 6);
             $table->timestamps(6);
             $table->foreignId('created_by')->nullable()->constrained('users')->restrictOnDelete();
             $table->foreignId('updated_by')->nullable()->constrained('users')->restrictOnDelete();
-            $table->foreignId('deleted_by')->nullable()->constrained('users')->restrictOnDelete();
-            $table->unique(['id', 'calendar_version_id'], 'sla_policy_calendar_uq');
         });
 
         Schema::create('sla_policy_targets', function (Blueprint $table): void {
@@ -129,7 +115,6 @@ return new class extends Migration
             $table->foreignId('priority_id')->constrained('priorities')->restrictOnDelete();
             $table->unsignedInteger('target_seconds');
             $table->unique(['sla_policy_id', 'priority_id'], 'sla_policy_priority_uq');
-            $table->unique(['sla_policy_id', 'priority_id', 'target_seconds'], 'sla_policy_target_snapshot_uq');
         });
 
         Schema::create('ticketing_settings', function (Blueprint $table): void {
@@ -137,7 +122,6 @@ return new class extends Migration
             $table->charset('utf8mb4');
             $table->collation('utf8mb4_0900_ai_ci');
             $table->unsignedTinyInteger('id')->primary();
-            $table->foreignId('current_sla_policy_id')->nullable()->constrained('sla_policies')->restrictOnDelete();
             $table->foreignId('updated_by')->nullable()->constrained('users')->restrictOnDelete();
             $table->unsignedBigInteger('lock_version')->default(1);
             $table->timestamps(6);
@@ -153,7 +137,7 @@ return new class extends Migration
         Schema::dropIfExists('sla_policies');
         Schema::dropIfExists('calendar_holidays');
         Schema::dropIfExists('calendar_windows');
-        Schema::dropIfExists('calendar_versions');
+        Schema::dropIfExists('business_calendars');
         Schema::dropIfExists('priorities');
         Schema::dropIfExists('categories');
         Schema::dropIfExists('agent_profiles');

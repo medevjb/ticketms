@@ -14,7 +14,7 @@ class SlaPolicyTargetFactory extends Factory
     public function definition(): array
     {
         return [
-            'sla_policy_id' => SlaPolicy::factory()->published(),
+            'sla_policy_id' => SlaPolicy::factory(),
             'priority_id' => Priority::factory(),
             'target_seconds' => 7200,
         ];

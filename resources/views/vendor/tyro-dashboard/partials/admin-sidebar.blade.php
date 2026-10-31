@@ -47,18 +47,19 @@
                 </svg>
                 Dashboard
             </a>
-            <a href="{{ route($dashboardRoute::name('profile')) }}" class="sidebar-link {{ request()->routeIs($dashboardRoute::pattern('profile*')) ? 'active' : '' }}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                My Profile
-            </a>
+
             @if(auth()->user() && auth()->user()->can('tickets.view'))
             <a href="{{ route('dashboard.tickets.index') }}" class="sidebar-link {{ request()->routeIs('dashboard.tickets.*') ? 'active' : '' }}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 5h16v14H4zM8 9h8M8 13h5" />
                 </svg>
                 Tickets
+            </a>
+            @endif
+            @if(auth()->user() && auth()->user()->can('tickets.view'))
+            <a href="{{ route('dashboard.users.index') }}" class="sidebar-link {{ request()->routeIs('dashboard.users.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2m14-13a4 4 0 11-8 0 4 4 0 018 0zm4 5.5a4 4 0 013 3.87V21" /></svg>
+                Users
             </a>
             @endif
             @if(auth()->user() && auth()->user()->can('analytics.view'))
@@ -138,7 +139,7 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v18m9-9H3M6 6l12 12m0-12L6 18" />
                 </svg>
-                SLA policies
+                SLA policy
             </a>
             @endif
             @if(auth()->user() && in_array('admin', auth()->user()->tyroRoleSlugs(), true) && auth()->user()->can('imports.manage'))
@@ -147,12 +148,6 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0L7 9m5-5l5 5M4 16v4h16v-4" />
                 </svg>
                 Ticket imports
-            </a>
-            @endif
-            @if(auth()->user() && in_array('admin', auth()->user()->tyroRoleSlugs(), true) && auth()->user()->can('users.manage'))
-            <a href="{{ route('dashboard.access.users') }}" class="sidebar-link {{ request()->routeIs('dashboard.access.users*') ? 'active' : '' }}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2m14-13a4 4 0 11-8 0 4 4 0 018 0zm4 5.5a4 4 0 013 3.87V21" /></svg>
-                User access
             </a>
             @endif
             @if(auth()->user() && in_array('admin', auth()->user()->tyroRoleSlugs(), true) && auth()->user()->can('roles.manage'))
@@ -287,17 +282,6 @@
 
         </div>
 
-        <!-- Media -->
-        <div class="sidebar-section">
-            <div class="sidebar-section-title">Media</div>
-            <a href="{{ route($dashboardRoute::name('media')) }}" class="sidebar-link {{ request()->routeIs($dashboardRoute::pattern('media*')) ? 'active' : '' }}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-                </svg>
-                Media Library
-            </a>
-        </div>
-
         @if(config('tyro-dashboard.features.show_resources_menu', true) && !empty($allResources ?? config('tyro-dashboard.resources')))
         <div class="sidebar-section">
             <div class="sidebar-section-title">Resources</div>
@@ -346,38 +330,5 @@
         </div>
         @endif
 
-        @if(!config('tyro-dashboard.disable_examples', false) && !app()->environment('production'))
-        <div class="sidebar-section">
-            <div class="sidebar-section-title">Examples</div>
-            <a href="{{ route($dashboardRoute::name('components')) }}" class="sidebar-link {{ (request()->routeIs($dashboardRoute::pattern('components')) || request()->routeIs($dashboardRoute::pattern('examples.components'))) ? 'active' : '' }}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h3a2 2 0 012 2v3a2 2 0 01-2 2H6a2 2 0 01-2-2V6z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 6a2 2 0 012-2h3a2 2 0 012 2v3a2 2 0 01-2 2h-3a2 2 0 01-2-2V6z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 15a2 2 0 012-2h3a2 2 0 012 2v3a2 2 0 01-2 2H6a2 2 0 01-2-2v-3z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 15a2 2 0 012-2h3a2 2 0 012 2v3a2 2 0 01-2 2h-3a2 2 0 01-2-2v-3z" />
-                </svg>
-                Dashboard Components
-            </a>
-
-            <a href="{{ route($dashboardRoute::name('widgets')) }}" class="sidebar-link {{ (request()->routeIs($dashboardRoute::pattern('widgets')) || request()->routeIs($dashboardRoute::pattern('examples.widgets'))) ? 'active' : '' }}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v18" />
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 12h18" />
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 5h6v6H5z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 13h6v6h-6z" />
-                </svg>
-                Widgets
-            </a>
-
-            @if(class_exists('HasinHayder\\TyroDashboardComponents\\TyroDashboardComponentsServiceProvider'))
-            <a href="{{ route($dashboardRoute::name('x-components')) }}" class="sidebar-link {{ request()->routeIs($dashboardRoute::pattern('x-components')) ? 'active' : '' }}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Form Components
-            </a>
-            @endif
-        </div>
-        @endif
     </nav>
 </aside>

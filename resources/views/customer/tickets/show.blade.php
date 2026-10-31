@@ -3,14 +3,16 @@
 @section('content')
 @php($statusLabels = ['open' => 'Open', 'in_progress' => 'In progress', 'waiting_customer' => 'Waiting for you', 'resolved' => 'Resolved', 'closed' => 'Closed'])
 <header class="customer-page-heading"><div><span class="customer-kicker" style="color:#0e7490">Support request</span><h1>{{ $ticket->number }}</h1><p>{{ $ticket->subject }}</p></div><a class="customer-button customer-button-quiet" href="{{ route('customer.tickets.index') }}">← All requests</a></header>
-<div class="customer-ticket-grid" data-ticket-status="{{ $ticket->status->value }}" data-customer-id="{{ $ticket->customer_id }}" data-current-user-id="{{ auth()->id() }}">
+@include('customer.service-status')
+<div class="customer-ticket-grid" data-customer-ticket-id="{{ $ticket->id }}" data-ticket-status="{{ $ticket->status->value }}" data-customer-id="{{ $ticket->customer_id }}" data-current-user-id="{{ auth()->id() }}">
     <div style="display:grid;gap:1rem">
         <section class="customer-panel"><div class="customer-panel-heading"><div><h2>Request details</h2><p>Created {{ $ticket->created_at?->timezone('Asia/Dhaka')->format('d M Y, h:i A') }} Dhaka time</p></div><span class="customer-badge customer-badge-{{ $ticket->status->value }}">{{ $statusLabels[$ticket->status->value] ?? str($ticket->status->value)->headline() }}</span></div><div class="customer-panel-body"><p style="margin:0;white-space:pre-wrap;line-height:1.75">{{ $ticket->description }}</p>@if($mayEditContent)<div style="margin-top:1rem"><a class="customer-button customer-button-quiet" href="{{ route('customer.tickets.edit', $ticket) }}">Edit request details</a></div>@endif
             @if($ticket->attachments->isNotEmpty())<div style="margin-top:1.3rem"><strong style="font-size:.8rem">Files attached to this request</strong>@foreach($ticket->attachments as $attachment)<div style="display:flex;justify-content:space-between;gap:1rem;padding:.7rem 0;border-bottom:1px solid #e2e8f0;font-size:.82rem"><span>{{ $attachment->original_name }} · {{ number_format($attachment->size_bytes / 1024, 0) }} KiB</span>@if($attachment->is_active && !$attachment->trashed())<a class="customer-link" href="{{ route('customer.ticket-attachments.download', $attachment) }}">Download</a>@else<span style="color:#94a3b8">Unavailable</span>@endif</div>@endforeach</div>@endif
         </div></section>
 
-        <section class="customer-panel customer-conversation-panel"><div class="customer-panel-heading"><div><h2>Conversation</h2><p>Replies from you and the support team.</p></div><span class="customer-conversation-count">{{ $messages->count() }} {{ \Illuminate\Support\Str::plural('message', $messages->count()) }}</span></div><div class="customer-panel-body customer-conversation-body">
-            @forelse($messages as $message)
+        <section class="customer-panel customer-conversation-panel"><div class="customer-panel-heading"><div><h2>Conversation</h2><p>Replies from you and the support team.</p></div><span class="customer-conversation-count">{{ $messages->count() }} {{ \Illuminate\Support\Str::plural('message', $messages->count()) }}</span></div><div class="customer-panel-body customer-conversation-body" tabindex="0" role="region" aria-label="Ticket conversation messages">
+            @include('admin.tickets.partials.initial-issue', ['timezone'=>'Asia/Dhaka', 'attachmentPreviewRoute'=>'customer.ticket-attachments.preview', 'attachmentDownloadRoute'=>'customer.ticket-attachments.download'])
+            @foreach($messages as $message)
                 @php($isCustomerMessage = (int) $message->author_id === (int) $ticket->customer_id)
                 <article class="customer-chat-message {{ $isCustomerMessage ? 'customer-chat-message-self' : 'customer-chat-message-support' }}" data-message-id="{{ $message->getKey() }}">
                     <span class="customer-chat-avatar" aria-hidden="true">{{ str($message->author?->name ?? 'S')->substr(0, 1)->upper() }}</span>
@@ -24,12 +26,16 @@
                         @else
                             <p class="customer-chat-bubble">{{ $message->body }}</p>
                             @foreach($message->attachments as $attachment)
+                                @if($attachment->isPreviewableImage() && $attachment->is_active && !$attachment->trashed())
+                                @include('admin.tickets.partials.attachment-preview', ['previewRoute'=>'customer.ticket-attachments.preview'])
+                                @else
                                 <div class="customer-chat-attachment"><span>{{ $attachment->original_name }} · {{ number_format($attachment->size_bytes / 1024, 0) }} KiB</span>@if($attachment->is_active && !$attachment->trashed())<a class="customer-link" href="{{ route('customer.ticket-attachments.download', $attachment) }}">Download</a>@else<span class="customer-chat-unavailable">Unavailable</span>@endif</div>
+                                @endif
                             @endforeach
                         @endif
                     </div>
                 </article>
-            @empty<p class="customer-chat-empty">There are no replies yet. Your request is ready for the support team.</p>@endforelse
+            @endforeach
         </div>
             @if($mayReply)
                 <div class="customer-chat-composer">
@@ -47,14 +53,14 @@
                             <div class="customer-chat-reopen-fields">
                                 <label class="customer-field-label" for="reopen-reason">Reason for reopening</label>
                                 <textarea class="customer-field" id="reopen-reason" name="reason" rows="2" minlength="5" maxlength="500" required>{{ old('reason') }}</textarea>
-                                @error('reason')<p class="customer-field-error">{{ $message }}</p>@enderror
+
                                 <label class="customer-chat-reopen-check"><input type="checkbox" name="reopen" value="1" required @checked(old('reopen'))> Reopen this request with my reply</label>
-                                @error('reopen')<p class="customer-field-error">{{ $message }}</p>@enderror
+
                             </div>
                         @endif
                         <div class="customer-chat-compose-box">
                             <textarea class="customer-chat-textarea" id="reply-body" name="body" rows="3" minlength="1" maxlength="20000" required placeholder="Write a message…">{{ old('body') }}</textarea>
-                            @error('body')<p class="customer-field-error">{{ $message }}</p>@enderror
+
                             <div class="customer-chat-compose-toolbar">
                                 <label class="customer-chat-attach-button" for="reply-attachments" title="Attach files">
                                     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m21.4 11.1-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8l9.2-9.2a3.7 3.7 0 0 1 5.2 5.2l-9.2 9.2a1.9 1.9 0 0 1-2.6-2.6l8.5-8.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -67,8 +73,8 @@
                             </div>
                         </div>
                         <p class="customer-chat-compose-hint">Up to 5 files, 10 MiB each · PDF, JPEG, PNG, TXT, or CSV</p>
-                        @error('attachments')<p class="customer-field-error">{{ $message }}</p>@enderror
-                        @error('attachments.*')<p class="customer-field-error">{{ $message }}</p>@enderror
+
+
                     </form>
                 </div>
             @endif
@@ -76,8 +82,16 @@
     </div>
 
     <aside class="customer-ticket-sidebar">
-        <section class="customer-panel"><div class="customer-panel-heading"><h2>At a glance</h2></div><div class="customer-panel-body"><dl class="customer-ticket-meta"><div><dt>Priority</dt><dd>{{ $ticket->priority?->name ?? '—' }}</dd></div><div><dt>Category</dt><dd>{{ $ticket->category?->name ?? '—' }}</dd></div><div><dt>Created</dt><dd>{{ $ticket->created_at?->timezone('Asia/Dhaka')->format('d M Y') }} · Dhaka time</dd></div></dl></div></section>
-        <section class="customer-panel"><div class="customer-panel-heading"><h2>Resolution target</h2></div><div class="customer-panel-body"><span class="customer-badge customer-badge-{{ $ticket->status->value }}">{{ str($sla['state'])->headline() }}</span><p style="margin:.8rem 0 .35rem;font-size:1.25rem;font-weight:800">{{ intdiv($sla['remaining_seconds'], 3600) }}h {{ intdiv($sla['remaining_seconds'] % 3600, 60) }}m <span style="font-size:.75rem;font-weight:600;color:#64748b">business time remaining</span></p>@if($sla['due_at'])<p style="margin:0;color:#64748b;font-size:.78rem">Target {{ $sla['due_at']->timezone('Asia/Dhaka')->format('d M Y, h:i A') }} Dhaka time</p>@elseif($sla['state'] === 'paused')<p style="margin:0;color:#64748b;font-size:.78rem">Clock paused since {{ $ticket->sla_paused_at?->timezone('Asia/Dhaka')->format('d M Y, h:i A') }} Dhaka time.</p>@endif</div></section>
+        <section class="customer-panel"><div class="customer-panel-heading"><h2>At a glance</h2></div><div class="customer-panel-body"><dl class="customer-ticket-meta"><div><dt>Priority</dt><dd data-ticket-priority>{{ $ticket->priority?->name ?? '—' }}</dd></div><div><dt>Category</dt><dd>{{ $ticket->category?->name ?? '—' }}</dd></div><div><dt>Created</dt><dd>{{ $ticket->created_at?->timezone('Asia/Dhaka')->format('d M Y') }} · Dhaka time</dd></div></dl></div></section>
+        <section class="customer-panel"><div class="customer-panel-heading"><h2>Your resolution target</h2></div><div class="customer-panel-body" data-sla-countdown="{{ json_encode($sla) }}" data-sla-ticket="{{ $ticket->id }}" data-sla-audience="customer">
+            <span class="customer-badge" data-sla-badge><span data-sla-status>{{ str($sla['state'])->headline() }}</span></span>
+            <p class="customer-resolution-clock" data-sla-clock role="timer">{{ sprintf('%02d:%02d:%02d', intdiv($sla['remaining_seconds'], 3600), intdiv($sla['remaining_seconds'] % 3600, 60), $sla['remaining_seconds'] % 60) }}</p>
+            <p class="customer-field-hint" data-sla-clock-note>Business time remaining</p>
+            @if($sla['due_at'])<p class="customer-resolution-deadline"><strong>Expected resolution by</strong><time datetime="{{ $sla['due_at']->toIso8601String() }}">{{ $sla['due_at']->timezone('Asia/Dhaka')->format('D, d M Y · h:i A') }} Dhaka time</time></p>
+            @elseif($sla['state'] === 'paused')<p class="customer-resolution-deadline">We are waiting for your reply. Your response resumes the SLA clock and updates the deadline.</p>
+            @elseif($sla['state'] === 'stopped')<p class="customer-resolution-deadline">This request is {{ $ticket->status->value }}. The resolution clock has stopped.</p>@endif
+            <p class="customer-field-hint">This target covers resolution, not the first reply. Non-working hours and holidays do not count. If the target has passed, check the conversation for the latest update.</p>
+        </div></section>
         @if(in_array(\App\Enums\TicketTransition::Close, $transitions, true))<section class="customer-panel"><div class="customer-panel-body"><h2 style="margin:0 0 .4rem;font-size:.95rem">All set?</h2><p style="margin:0 0 .9rem;color:#64748b;font-size:.8rem;line-height:1.5">Close this request when the issue has been resolved for you.</p><form method="POST" action="{{ route('customer.tickets.transition', $ticket) }}">@csrf @method('PATCH')<input type="hidden" name="transition" value="close"><input type="hidden" name="operation_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}"><input type="hidden" name="lock_version" value="{{ $ticket->lock_version }}"><button class="customer-button customer-button-quiet" type="submit">Close request</button></form></div></section>@endif
     </aside>
 </div>

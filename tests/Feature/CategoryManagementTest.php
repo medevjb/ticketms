@@ -21,8 +21,10 @@ it('allows administrators to browse categories and denies non-administrative rol
         ->assertOk()
         ->assertSee('Billing')
         ->assertSee('billing');
-    $this->get(route('dashboard.categories.create'))->assertOk()->assertSee('Create category');
-    $this->get(route('dashboard.categories.edit', $category))->assertOk()->assertSee('Edit category');
+    $this->get(route('dashboard.categories.create'))->assertRedirectToRoute('dashboard.categories.index', ['create' => 1]);
+    $this->get(route('dashboard.categories.index', ['create' => 1]))->assertOk()->assertSee('id="category-editor"', false)->assertSee('Create category');
+    $this->get(route('dashboard.categories.edit', $category))->assertRedirectToRoute('dashboard.categories.index', ['edit' => $category->id]);
+    $this->get(route('dashboard.categories.index', ['edit' => $category->id]))->assertOk()->assertSee('Edit category');
 
     $agent = User::factory()->create();
     $agent->assignRole(Role::query()->where('name', 'agent')->firstOrFail());
@@ -118,4 +120,14 @@ it('rejects category management from a custom role even when it has the register
     $customUser->assignRole($customRole);
 
     $this->actingAs($customUser)->get(route('dashboard.categories.index'))->assertRedirect();
+});
+
+it('reopens the category modal with submitted values after validation fails', function (): void {
+    $this->actingAs($this->admin)->from(route('dashboard.categories.index'))->post(route('dashboard.categories.store'), [
+        'category_form' => 1, 'category_modal_id' => '', 'name' => '', 'slug' => 'custom-slug', 'slug_mode' => 'custom', 'description' => 'Preserve this input.',
+    ])->assertRedirectToRoute('dashboard.categories.index');
+
+    $this->get(route('dashboard.categories.index'))->assertOk()
+        ->assertSee('id="category-editor"', false)->assertSee('custom-slug')->assertSee('Preserve this input.')
+        ->assertViewHas('openCategoryEditor', true);
 });

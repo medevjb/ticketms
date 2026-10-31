@@ -9,6 +9,7 @@ use App\Services\Tickets\NotificationCenterService;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -35,10 +36,15 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+        Model::preventLazyLoading(! $this->app->isProduction());
         RateLimiter::for('ticket-create', fn (Request $request): Limit => Limit::perMinute(10)->by($this->rateLimitKey($request, 'ticket-create')));
         RateLimiter::for('ticket-replies', fn (Request $request): Limit => Limit::perMinute(30)->by($this->rateLimitKey($request, 'ticket-replies')));
         RateLimiter::for('ticket-imports', fn (Request $request): Limit => Limit::perHour(3)->by($this->rateLimitKey($request, 'ticket-imports')));
         RateLimiter::for('ticket-downloads', fn (Request $request): Limit => Limit::perMinute(60)->by($this->rateLimitKey($request, 'ticket-downloads')));
+        RateLimiter::for('user-api-token', fn (Request $request): array => [
+            Limit::perMinute(20)->by('ip:'.$request->ip()),
+            Limit::perMinute(5)->by('email:'.mb_strtolower(trim((string) $request->input('email')))),
+        ]);
         config([
             'tyro-login.redirects.after_login' => '/dashboard',
             'tyro-login.registration.require_email_verification' => config('ticketing-auth.require_email_verification'),

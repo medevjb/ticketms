@@ -97,7 +97,7 @@ class AgentManagementService
             $this->assignments->lockCoordinator();
             $agent = User::query()->whereKey($agentId)->lockForUpdate()->firstOrFail();
 
-            if (! in_array('agent', $agent->tyroRoleSlugs(), true)) {
+            if (! $this->hasAgentRole($agent)) {
                 throw ValidationException::withMessages(['agent' => 'Only an active agent account can receive an agent profile.']);
             }
 
@@ -129,7 +129,7 @@ class AgentManagementService
             $agent = User::query()->whereKey($agentId)->lockForUpdate()->firstOrFail();
 
             if ($profile->invitation_accepted_at !== null || $profile->invitation_token_hash === null
-                || ! in_array('agent', $agent->tyroRoleSlugs(), true)) {
+                || ! $this->hasAgentRole($agent)) {
                 throw ValidationException::withMessages(['agent' => 'This agent does not have a pending invitation.']);
             }
 
@@ -178,7 +178,7 @@ class AgentManagementService
             }
 
             $agent = User::query()->whereKey($profile->user_id)->lockForUpdate()->firstOrFail();
-            if (! in_array('agent', $agent->tyroRoleSlugs(), true) || $agent->is_active || $profile->is_active) {
+            if (! $this->hasAgentRole($agent) || $agent->is_active || $profile->is_active) {
                 throw ValidationException::withMessages(['token' => 'This invitation is no longer available. Contact your administrator.']);
             }
 
@@ -206,7 +206,7 @@ class AgentManagementService
         $this->authorizeManagement($actor);
         $agent = User::query()->whereKey($agentId)->firstOrFail();
 
-        if (! in_array('agent', $agent->tyroRoleSlugs(), true) || $agent->agentProfile === null) {
+        if (! $this->hasAgentRole($agent) || $agent->agentProfile === null) {
             throw ValidationException::withMessages(['agent' => 'Choose an account with an agent profile.']);
         }
 
@@ -215,6 +215,12 @@ class AgentManagementService
         }
 
         $this->userLifecycle->setActive($agent, $isActive, $actor);
+    }
+
+    private function hasAgentRole(User $agent): bool
+    {
+        return $agent->roles()->where('name', 'agent')->where('guard_name', 'web')
+            ->where('is_active', true)->exists();
     }
 
     private function activeAgentRole(bool $lock = false): Role

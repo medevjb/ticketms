@@ -13,9 +13,11 @@
         "hasinhayder/tyro-dashboard": "^1.59",
         "inertiajs/inertia-laravel": "^3.0",
         "laravel/framework": "^13.17",
+        "laravel/reverb": "^1.12",
         "laravel/tinker": "^3.0",
         "laravel/wayfinder": "^0.1.14",
-        "spatie/laravel-permission": "^8.0"
+        "spatie/laravel-permission": "^8.0",
+        "yajra/laravel-datatables-oracle": "^13.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.24",

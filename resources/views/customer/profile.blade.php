@@ -22,7 +22,7 @@
                 <div class="customer-field-wrap">
                     <label class="customer-field-label" for="name">Full name</label>
                     <input class="customer-field" id="name" name="name" type="text" value="{{ old('name', $customer->name) }}" autocomplete="name" maxlength="255" required>
-                    @error('name')<p class="customer-field-error">{{ $message }}</p>@enderror
+
                 </div>
                 <button type="submit" class="customer-button">Save profile</button>
             </form>
@@ -37,7 +37,7 @@
                 <div class="customer-field-wrap">
                     <label class="customer-field-label" for="avatar">Upload a photo</label>
                     <input class="customer-field" id="avatar" name="avatar" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" required>
-                    @error('avatar')<p class="customer-field-error">{{ $message }}</p>@enderror
+
                 </div>
                 <button type="submit" class="customer-button">Upload photo</button>
             </form>
@@ -61,12 +61,12 @@
                     <div class="customer-field-wrap">
                         <label class="customer-field-label" for="current_password">Current password</label>
                         <input class="customer-field" id="current_password" name="current_password" type="password" autocomplete="current-password" required>
-                        @error('current_password')<p class="customer-field-error">{{ $message }}</p>@enderror
+
                     </div>
                     <div class="customer-field-wrap">
                         <label class="customer-field-label" for="password">New password</label>
                         <input class="customer-field" id="password" name="password" type="password" autocomplete="new-password" required>
-                        @error('password')<p class="customer-field-error">{{ $message }}</p>@enderror
+
                     </div>
                     <div class="customer-field-wrap">
                         <label class="customer-field-label" for="password_confirmation">Confirm new password</label>

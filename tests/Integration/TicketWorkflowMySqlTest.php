@@ -4,6 +4,7 @@ use App\Enums\TicketStatus;
 use App\Enums\TicketTransition;
 use App\Models\ActivityEntry;
 use App\Models\AgentProfile;
+use App\Models\BusinessCalendar;
 use App\Models\Category;
 use App\Models\CommandReceipt;
 use App\Models\Priority;
@@ -11,7 +12,6 @@ use App\Models\Role;
 use App\Models\SlaPolicy;
 use App\Models\SlaPolicyTarget;
 use App\Models\Ticket;
-use App\Models\TicketingSetting;
 use App\Models\TicketSlaInterval;
 use App\Models\User;
 use App\Services\Analytics\TicketAnalyticsService;
@@ -167,8 +167,7 @@ test('mysql simultaneous claims and manual assignment produce one winner and one
         $agent->assignRole($agentRole);
         AgentProfile::factory()->create(['user_id' => $agent->getKey(), 'auto_assignment_enabled' => false]);
     }
-    $settings = TicketingSetting::query()->findOrFail(1);
-    $policy = SlaPolicy::query()->whereKey($settings->current_sla_policy_id)->firstOrFail();
+    $policy = SlaPolicy::query()->firstOrFail();
     $priority = Priority::query()->where('slug', 'high')->firstOrFail();
     $target = SlaPolicyTarget::query()
         ->where('sla_policy_id', $policy->getKey())
@@ -180,7 +179,7 @@ test('mysql simultaneous claims and manual assignment produce one winner and one
         'category_id' => Category::query()->active()->firstOrFail()->getKey(),
         'priority_id' => $priority->getKey(),
         'sla_policy_id' => $policy->getKey(),
-        'calendar_version_id' => $policy->calendar_version_id,
+        'business_calendar_id' => BusinessCalendar::query()->firstOrFail()->id,
         'sla_target_seconds' => $target->target_seconds,
     ])->refresh();
     $agentIds = $agents->modelKeys();

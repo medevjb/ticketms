@@ -10,7 +10,9 @@ class TicketPriorityRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->can('tickets.change_priority') ?? false;
+        return $this->user() !== null
+            && in_array('admin', $this->user()->tyroRoleSlugs(), true)
+            && $this->user()->can('tickets.change_priority');
     }
 
     /** @return array<string, ValidationRule|array<mixed>|string> */

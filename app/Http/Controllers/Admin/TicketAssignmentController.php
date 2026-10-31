@@ -7,21 +7,14 @@ use App\Http\Requests\Tickets\AutoAssignmentRequest;
 use App\Http\Requests\Tickets\ClaimTicketRequest;
 use App\Services\Tickets\AssignmentService;
 use HasinHayder\TyroDashboard\Http\Controllers\BaseController;
-use HasinHayder\TyroDashboard\Support\DashboardRoute;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\View\View;
 
 class TicketAssignmentController extends BaseController
 {
-    public function agents(AssignmentService $assignments): View
+    public function agents(): RedirectResponse
     {
-        $actor = request()->user();
-
-        return view('admin.tickets.agents', $this->getViewData([
-            'dashboardRoute' => DashboardRoute::class,
-            'agents' => $assignments->agentRoster($actor),
-        ]));
+        return to_route('dashboard.agents.index');
     }
 
     public function setAutoAssignment(AutoAssignmentRequest $request, int $agent, AssignmentService $assignments): RedirectResponse|JsonResponse

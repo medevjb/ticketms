@@ -51,6 +51,7 @@ class TicketConversationController extends Controller
                         'name' => $attachment->original_name,
                         'size' => $attachment->size_bytes,
                         'url' => route('customer.ticket-attachments.download', $attachment),
+                        'preview_url' => $attachment->isPreviewableImage() ? route('customer.ticket-attachments.preview', $attachment) : null,
                     ])->values(),
                 ],
             ], 201);

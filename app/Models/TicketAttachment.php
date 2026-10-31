@@ -40,6 +40,11 @@ class TicketAttachment extends Model
         $query->where($this->qualifyColumn('is_active'), true);
     }
 
+    public function isPreviewableImage(): bool
+    {
+        return in_array($this->mime_type, ['image/jpeg', 'image/png'], true);
+    }
+
     /** @return BelongsTo<Ticket, $this> */
     public function ticket(): BelongsTo
     {

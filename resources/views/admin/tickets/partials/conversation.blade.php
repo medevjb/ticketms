@@ -12,13 +12,14 @@
             @endif
         </div>
     </div>
-    <div class="ticket-conversation-body">
-        @forelse($messages as $message)
+    <div class="ticket-conversation-body" tabindex="0" role="region" aria-label="Ticket conversation messages">
+        @include('admin.tickets.partials.initial-issue', ['timezone'=>config('ticketing.display_timezone', 'Asia/Dhaka'), 'attachmentPreviewRoute'=>'dashboard.ticket-attachments.preview', 'attachmentDownloadRoute'=>'dashboard.ticket-attachments.download'])
+        @foreach($messages as $message)
             @if($message->visibility->value === 'internal')
                 <article class="ticket-internal-note-row" data-message-id="{{ $message->getKey() }}">
                     <span class="ticket-internal-note-icon" aria-hidden="true">▣</span>
                     <div class="ticket-internal-note-copy">
-                        <div class="ticket-internal-note-meta"><strong>{{ $message->author?->name ?? 'Former user' }}</strong><span>{{ $message->created_at?->timezone('Asia/Dhaka')->format('d M Y, h:i A') }}</span>@if($message->trashed())<span class="ticket-message-tag ticket-message-tag-muted">Archived</span>@elseif(!$message->is_active)<span class="ticket-message-tag ticket-message-tag-muted">Hidden</span>@endif</div>
+                        <div class="ticket-internal-note-meta"><strong>{{ $message->author?->name ?? 'Former user' }}</strong><span>{{ $message->created_at?->timezone(config('ticketing.display_timezone', 'Asia/Dhaka'))->format('d M Y, h:i A') }}</span>@if($message->trashed())<span class="ticket-message-tag ticket-message-tag-muted">Archived</span>@elseif(!$message->is_active)<span class="ticket-message-tag ticket-message-tag-muted">Hidden</span>@endif</div>
                         <p>{{ str($message->body)->limit(150) }}</p>
                     </div>
                     <button type="button" class="ticket-internal-note-open" data-note-dialog="ticket-note-dialog-{{ $message->getKey() }}">View note <span aria-hidden="true">↗</span></button>
@@ -27,7 +28,7 @@
                 <dialog class="ticket-note-dialog" id="ticket-note-dialog-{{ $message->getKey() }}" aria-labelledby="ticket-note-title-{{ $message->getKey() }}" {{ (string) old('note_message_id') === (string) $message->getKey() ? 'data-open-on-load' : '' }}>
                     <div class="ticket-note-dialog-panel">
                         <header class="ticket-note-dialog-header">
-                            <div><span class="ticket-note-dialog-kicker">Private staff note</span><h2 id="ticket-note-title-{{ $message->getKey() }}">Note from {{ $message->author?->name ?? 'Former user' }}</h2><p>{{ $message->created_at?->timezone('Asia/Dhaka')->format('D, d M Y · h:i A') }} Dhaka time</p></div>
+                            <div><span class="ticket-note-dialog-kicker">Private staff note</span><h2 id="ticket-note-title-{{ $message->getKey() }}">Note from {{ $message->author?->name ?? 'Former user' }}</h2><p>{{ $message->created_at?->timezone(config('ticketing.display_timezone', 'Asia/Dhaka'))->format('D, d M Y · h:i A') }} {{ config('ticketing.display_timezone', 'Asia/Dhaka') }} time</p></div>
                             <button type="button" class="ticket-note-dialog-close" data-note-dialog-close aria-label="Close note">×</button>
                         </header>
                         <div class="ticket-note-dialog-body">
@@ -39,13 +40,7 @@
                             @if($message->attachments->isNotEmpty())
                                 <div class="ticket-note-files"><h3>Attachments</h3>
                                     @foreach($message->attachments as $attachment)
-                                        <div class="ticket-message-attachment">
-                                            <span><strong>{{ $attachment->original_name }}</strong><small>{{ number_format($attachment->size_bytes / 1024, 0) }} KiB</small></span>
-                                            @if($attachment->is_active && !$attachment->trashed() && $message->is_active && !$message->trashed())<a href="{{ route('dashboard.ticket-attachments.download', $attachment) }}">Download</a>@else<span class="ticket-message-attachment-unavailable">Unavailable</span>@endif
-                                            @if($isAdmin && auth()->user()->can('attachments.moderate'))
-                                                <form method="POST" action="{{ route('dashboard.tickets.attachments.moderate', [$ticket, $attachment]) }}" class="ticket-moderation-form">@csrf<input type="hidden" name="operation_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}"><input type="hidden" name="expected_updated_at" value="{{ $attachment->updated_at?->format('Y-m-d\TH:i:s.uP') }}"><input type="hidden" name="note_message_id" value="{{ $message->getKey() }}"><select name="action" class="form-input" required>@if($attachment->trashed())<option value="restore">Restore</option>@elseif($attachment->is_active)<option value="disable">Disable</option><option value="archive">Archive</option>@else<option value="enable">Enable</option><option value="archive">Archive</option>@endif</select><input name="reason" class="form-input" required minlength="5" maxlength="500" placeholder="Reason for file change"><button class="btn btn-secondary" type="submit">Save</button></form>
-                                            @endif
-                                        </div>
+                                        @include('admin.tickets.partials.conversation-attachment')
                                     @endforeach
                                 </div>
                             @endif
@@ -61,7 +56,7 @@
                     <div class="ticket-message-avatar" aria-hidden="true">{{ str($message->author?->name ?? 'U')->substr(0, 1)->upper() }}</div>
                     <div class="ticket-message-content">
                         <header class="ticket-message-header">
-                            <div class="ticket-message-author"><strong>{{ $message->author?->name ?? 'Former user' }}</strong><span>{{ $message->created_at?->timezone('Asia/Dhaka')->format('d M Y, h:i A') }} Dhaka time</span></div>
+                            <div class="ticket-message-author"><strong>{{ $message->author?->name ?? 'Former user' }}</strong><span>{{ $message->created_at?->timezone(config('ticketing.display_timezone', 'Asia/Dhaka'))->format('d M Y, h:i A') }} {{ config('ticketing.display_timezone', 'Asia/Dhaka') }} time</span></div>
                             <div class="ticket-message-tags"><span class="ticket-message-tag ticket-message-tag-public">{{ (int) $message->author_id === (int) $ticket->customer_id ? 'Customer' : 'Support team' }}</span>@if($message->trashed())<span class="ticket-message-tag ticket-message-tag-muted">Archived</span>@elseif(!$message->is_active)<span class="ticket-message-tag ticket-message-tag-muted">Hidden</span>@endif</div>
                         </header>
 
@@ -73,13 +68,7 @@
 
                         @if($message->is_active || !in_array('customer', auth()->user()->tyroRoleSlugs(), true))
                             @foreach($message->attachments as $attachment)
-                                <div class="ticket-message-attachment">
-                                    <span><strong>{{ $attachment->original_name }}</strong><small>{{ number_format($attachment->size_bytes / 1024, 0) }} KiB</small></span>
-                                    @if($attachment->is_active && !$attachment->trashed() && $message->is_active && !$message->trashed())<a href="{{ route('dashboard.ticket-attachments.download', $attachment) }}">Download</a>@else<span class="ticket-message-attachment-unavailable">Unavailable</span>@endif
-                                    @if($isAdmin && auth()->user()->can('attachments.moderate'))
-                                        <form method="POST" action="{{ route('dashboard.tickets.attachments.moderate', [$ticket, $attachment]) }}" class="ticket-moderation-form">@csrf<input type="hidden" name="operation_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}"><input type="hidden" name="expected_updated_at" value="{{ $attachment->updated_at?->format('Y-m-d\TH:i:s.uP') }}"><select name="action" class="form-input" required>@if($attachment->trashed())<option value="restore">Restore</option>@elseif($attachment->is_active)<option value="disable">Disable</option><option value="archive">Archive</option>@else<option value="enable">Enable</option><option value="archive">Archive</option>@endif</select><input name="reason" class="form-input" required minlength="5" maxlength="500" placeholder="Reason for file change"><button class="btn btn-secondary" type="submit">Save</button></form>
-                                    @endif
-                                </div>
+                                @include('admin.tickets.partials.conversation-attachment')
                             @endforeach
                         @endif
 
@@ -89,9 +78,7 @@
                     </div>
                 </article>
             @endif
-        @empty
-            <div class="ticket-conversation-empty"><span aria-hidden="true">◌</span><strong>No conversation activity yet</strong><p>Customer replies and support updates will appear here.</p></div>
-        @endforelse
+        @endforeach
     </div>
 </section>
 
@@ -105,9 +92,9 @@
             @endif
             <form method="POST" enctype="multipart/form-data" action="{{ route('dashboard.tickets.messages.store', $ticket) }}" class="ticket-composer-form" data-axios-form="reply">
                 @csrf<input type="hidden" name="operation_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}"><input type="hidden" name="lock_version" value="{{ $ticket->lock_version }}"><input type="hidden" name="visibility" value="public">
-                <label class="sr-only" for="public-reply">Write a reply to the customer</label><textarea id="public-reply" name="body" rows="4" minlength="5" maxlength="20000" required class="form-input ticket-chat-textarea" placeholder="Write a reply…">{{ old('body') }}</textarea>@error('body')<p class="form-error" role="alert">{{ $message }}</p>@enderror
-                @if($ticket->status->value === 'resolved')<label class="form-label" for="reopen-reason">Reason for reopening</label><textarea id="reopen-reason" name="reason" rows="2" minlength="5" maxlength="500" required class="form-input">{{ old('reason') }}</textarea><label class="ticket-reopen-check"><input type="checkbox" name="reopen" value="1" required> Reopen this ticket with my reply</label>@error('reopen')<p class="form-error" role="alert">{{ $message }}</p>@enderror @error('reason')<p class="form-error" role="alert">{{ $message }}</p>@enderror @endif
-                <div class="ticket-chat-attachment-row"><label class="ticket-chat-attachment-label" for="reply-attachments"><span aria-hidden="true">＋</span> Attach files</label><input id="reply-attachments" name="attachments[]" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.txt,.csv" class="form-input ticket-chat-file-input"></div><p class="ticket-upload-hint">Up to 5 private files, 10 MiB each. PDF, JPEG, PNG, TXT, or CSV.</p>@error('attachments')<p class="form-error" role="alert">{{ $message }}</p>@enderror @error('attachments.*')<p class="form-error" role="alert">{{ $message }}</p>@enderror
+                <label class="sr-only" for="public-reply">Write a reply to the customer</label><textarea id="public-reply" name="body" rows="4" minlength="5" maxlength="20000" required class="form-input ticket-chat-textarea" placeholder="Write a reply…">{{ old('body') }}</textarea>
+                @if($ticket->status->value === 'resolved')<label class="form-label" for="reopen-reason">Reason for reopening</label><textarea id="reopen-reason" name="reason" rows="2" minlength="5" maxlength="500" required class="form-input">{{ old('reason') }}</textarea><label class="ticket-reopen-check"><input type="checkbox" name="reopen" value="1" required> Reopen this ticket with my reply</label>  @endif
+                <div class="ticket-chat-attachment-row"><label class="ticket-chat-attachment-label" for="reply-attachments"><span aria-hidden="true">＋</span> Attach files</label><input id="reply-attachments" name="attachments[]" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.txt,.csv" class="form-input ticket-chat-file-input"></div><p class="ticket-upload-hint">Up to 5 private files, 10 MiB each. PDF, JPEG, PNG, TXT, or CSV.</p>
                 <div class="ticket-composer-footer"><span class="ticket-composer-private"><span aria-hidden="true">◉</span> Only the customer and support team can see this reply</span><button class="btn btn-primary" type="submit"><span aria-hidden="true">➤</span> Send reply</button></div>
             </form>
         </div>
@@ -121,8 +108,8 @@
         <div class="ticket-panel-body">
             <form method="POST" enctype="multipart/form-data" action="{{ route('dashboard.tickets.messages.store', $ticket) }}" class="ticket-composer-form">
                 @csrf<input type="hidden" name="operation_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}"><input type="hidden" name="lock_version" value="{{ $ticket->lock_version }}"><input type="hidden" name="visibility" value="internal">
-                <label class="form-label" for="internal-note">Note</label><textarea id="internal-note" name="body" rows="4" minlength="5" maxlength="20000" required class="form-input">{{ old('body') }}</textarea>@error('body')<p class="form-error" role="alert">{{ $message }}</p>@enderror
-                <label class="form-label" for="note-attachments">Attachments <span class="ticket-optional">Optional</span></label><input id="note-attachments" name="attachments[]" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.txt,.csv" class="form-input"><p class="ticket-upload-hint">Up to 5 private files, 10 MiB each. PDF, JPEG, PNG, TXT, or CSV.</p>@error('attachments')<p class="form-error" role="alert">{{ $message }}</p>@enderror @error('attachments.*')<p class="form-error" role="alert">{{ $message }}</p>@enderror
+                <label class="form-label" for="internal-note">Note</label><textarea id="internal-note" name="body" rows="4" minlength="5" maxlength="20000" required class="form-input">{{ old('body') }}</textarea>
+                <label class="form-label" for="note-attachments">Attachments <span class="ticket-optional">Optional</span></label><input id="note-attachments" name="attachments[]" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.txt,.csv" class="form-input"><p class="ticket-upload-hint">Up to 5 private files, 10 MiB each. PDF, JPEG, PNG, TXT, or CSV.</p>
                 <div class="ticket-composer-footer"><span class="ticket-composer-private"><span aria-hidden="true">▣</span> Internal to support team</span><button class="btn btn-secondary" type="submit">Add internal note</button></div>
             </form>
         </div>

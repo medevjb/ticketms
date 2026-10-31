@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Models\CalendarVersion;
+use App\Models\BusinessCalendar;
 use App\Models\CalendarWindow;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -13,7 +13,7 @@ class CalendarWindowFactory extends Factory
     public function definition(): array
     {
         return [
-            'calendar_version_id' => CalendarVersion::factory(),
+            'business_calendar_id' => BusinessCalendar::factory(),
             'weekday' => 7,
             'opens_at' => '09:00:00',
             'closes_at' => '18:00:00',

@@ -1,17 +1,18 @@
-<header class="topbar">
+<header class="topbar workspace-topbar">
     <div class="topbar-left">
-        <button type="button" class="mobile-menu-btn" onclick="toggleSidebar()">
+        <button type="button" class="mobile-menu-btn" onclick="toggleSidebar()" aria-label="Toggle navigation" aria-controls="sidebar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
         </button>
 
-        <nav class="breadcrumb">
+        <div class="workspace-page-context"><span class="workspace-eyebrow">Support workspace</span><nav class="breadcrumb" aria-label="Breadcrumb">
             @yield('breadcrumb')
-        </nav>
+        </nav></div>
     </div>
 
     <div class="topbar-right">
+        <span class="workspace-timezone" title="Display timezone">{{ config('ticketing.display_timezone', 'Asia/Dhaka') }}</span>
         @if(auth()->check() && auth()->user()->can('notifications.view'))
             <a href="{{ route('dashboard.notifications.index') }}" class="topbar-btn" aria-label="Notifications, {{ $ticketUnreadNotificationCount ?? 0 }} unread" title="Notifications">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -24,7 +25,7 @@
         @endif
 
         <!-- Theme Toggle -->
-        <button type="button" class="topbar-btn" onclick="toggleTheme()" aria-label="Toggle theme">
+        <button type="button" class="topbar-btn" onclick="toggleTheme()" aria-label="Toggle light and dark appearance" title="Toggle appearance">
             <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
             </svg>
@@ -35,7 +36,7 @@
 
         <!-- User Dropdown -->
         <div class="user-dropdown" id="userDropdown">
-            <button type="button" class="user-dropdown-btn" onclick="toggleUserDropdown()">
+            <button type="button" id="account-menu-button" class="user-dropdown-btn" onclick="toggleUserDropdown()" aria-expanded="false" aria-controls="account-menu" aria-label="Account menu for {{ $user->name }}">
                 <div class="user-avatar" style="{{ ((method_exists($user, 'hasProfilePhotoColumn') && $user->hasProfilePhotoColumn() && $user->profile_photo_path) || (method_exists($user, 'hasGravatarColumn') && $user->hasGravatarColumn() && $user->use_gravatar)) ? 'background: none; padding: 0;' : '' }}">
                     @if((method_exists($user, 'hasProfilePhotoColumn') && $user->hasProfilePhotoColumn() && $user->profile_photo_path) || (method_exists($user, 'hasGravatarColumn') && $user->hasGravatarColumn() && $user->use_gravatar && $user->email))
                         <img src="{{ $user->profile_photo_url }}" alt="{{ $user->name }}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
@@ -58,7 +59,7 @@
                 </svg>
             </button>
 
-            <div class="user-dropdown-menu">
+            <div class="user-dropdown-menu" id="account-menu" aria-labelledby="account-menu-button"><div class="workspace-account-heading">Your account</div>
                 <a href="{{ route($dashboardRoute::name('profile')) }}" class="dropdown-item">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -69,7 +70,7 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                     </svg>
-                    Frontend
+                    Visit website
                 </a>
                 <div class="dropdown-divider"></div>
                 @if(session('impersonator_id'))

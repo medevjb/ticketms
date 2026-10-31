@@ -119,7 +119,7 @@ return [
         'privilege_management' => false,
         'settings_management' => true,
         'profile_management' => true,
-        'invitation_system' => env('TYRO_DASHBOARD_ENABLE_INVITATION', true),
+        'invitation_system' => false,
         'audit_logs' => env('TYRO_DASHBOARD_ENABLE_AUDIT_LOGS', false),
         'system_settings' => env('TYRO_DASHBOARD_ENABLE_SYSTEM_SETTINGS', true),
         'smtp_settings' => env('TYRO_DASHBOARD_ENABLE_SMTP_SETTINGS', true),
@@ -186,7 +186,7 @@ return [
     'notifications' => [
         'show_flash_messages' => true,
         'auto_dismiss_seconds' => 5,
-        'notification_style' => env('TYRO_DASHBOARD_NOTIFICATION_STYLE', 'toast'), // 'legacy' or 'toast'
+        'notification_style' => 'toast', // 'legacy' or 'toast'
         'toast_position' => env('TYRO_DASHBOARD_TOAST_POSITION', 'bottom-right'), // 'top-right' or 'bottom-right'
     ],
 
@@ -284,7 +284,7 @@ return [
     | and the example routes will be disabled.
     |
     */
-    'disable_examples' => env('TYRO_DASHBOARD_DISABLE_EXAMPLES', false),
+    'disable_examples' => true,
 
     /*
     |--------------------------------------------------------------------------

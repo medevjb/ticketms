@@ -63,6 +63,10 @@ class UserLifecycleService
         $this->authorizeUserManagement($actor);
         $this->preventSelfLifecycleChange($target, $actor);
 
+        if ($target->trashed()) {
+            return;
+        }
+
         DB::transaction(function () use ($target, $actor): void {
             $this->assignments->lockCoordinator();
             $liveTickets = $this->assignments->lockAssignmentsForDeactivation((int) $target->getKey());

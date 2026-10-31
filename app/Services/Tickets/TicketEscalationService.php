@@ -113,7 +113,7 @@ class TicketEscalationService
                 'consumed_seconds' => $snapshot['consumed_seconds'],
                 'target_seconds' => $ticket->sla_target_seconds,
                 'sla_policy_id' => $ticket->sla_policy_id,
-                'calendar_version_id' => $ticket->calendar_version_id,
+                'business_calendar_id' => $ticket->business_calendar_id,
             ],
             MessageVisibility::Internal,
             Ticket::class,

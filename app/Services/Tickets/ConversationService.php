@@ -156,7 +156,7 @@ class ConversationService
         if (DB::transactionLevel() === 0) {
             throw new \LogicException('Transition messages must be created inside the ticket transaction.');
         }
-        $this->authorizeMessage($author, $ticket, MessageVisibility::Public);
+        $this->authorizeMessage($author, $ticket, MessageVisibility::Public, true);
 
         return $this->createMessageInTransaction(
             $ticket,
@@ -204,9 +204,6 @@ class ConversationService
             && ! $this->isAdministrator($actor)
             && ! $this->isCustomerOwner($actor, $ticket)) {
             return false;
-        }
-        if ($this->isAdministrator($actor)) {
-            return $this->permissions->allows($actor, 'tickets.reply_public');
         }
         if ($this->isCustomerOwner($actor, $ticket)) {
             return $ticket->is_active
@@ -313,7 +310,7 @@ class ConversationService
         return $message;
     }
 
-    private function authorizeMessage(User $actor, Ticket $ticket, MessageVisibility $visibility): void
+    private function authorizeMessage(User $actor, Ticket $ticket, MessageVisibility $visibility, bool $isTransitionMessage = false): void
     {
         $this->assertCanViewTicket($actor, $ticket);
         if ($ticket->status === TicketStatus::Closed) {
@@ -332,7 +329,8 @@ class ConversationService
             return;
         }
 
-        if (! $this->permissions->allows($actor, 'tickets.reply_public')
+        if (($this->isAdministrator($actor) && ! $isTransitionMessage)
+            || ! $this->permissions->allows($actor, 'tickets.reply_public')
             || ! ($this->isAdministrator($actor) || $this->isCustomerOwner($actor, $ticket) || $this->isAssignedAgent($actor, $ticket))) {
             throw new AuthorizationException;
         }

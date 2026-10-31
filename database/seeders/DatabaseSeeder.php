@@ -17,7 +17,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             TicketingConfigurationSeeder::class,
             AuthorizationPermissionSeeder::class,
-            TicketingUsersSeeder::class,
+            TicketingTestAccountsSeeder::class,
         ]);
     }
 }

@@ -15,7 +15,7 @@
     <div class="page-header-row">
         <div>
             <h1 class="page-title">Import run #{{ $run->id }}</h1>
-            <p class="page-description">Source <code>{{ $run->source }}</code> · uploaded by {{ $run->uploader?->name ?? 'Unavailable' }} · {{ $run->created_at?->timezone(config('app.timezone'))->format('Y-m-d H:i') }}</p>
+            <p class="page-description">Source <code>{{ $run->source }}</code> · uploaded by {{ $run->uploader?->name ?? 'Unavailable' }} · {{ $run->created_at?->timezone(config('ticketing.display_timezone', 'Asia/Dhaka'))->format('Y-m-d H:i') }}</p>
         </div>
         <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
             <a href="{{ route('dashboard.ticket-imports.show', $run->id) }}" class="btn btn-secondary">Refresh progress</a>
@@ -42,9 +42,9 @@
                 <tr><th>Created tickets</th><td>{{ number_format($run->created_rows) }}</td></tr>
                 <tr><th>Invalid rows</th><td>{{ number_format($run->invalid_rows) }}</td></tr>
                 <tr><th>Duplicate source IDs</th><td>{{ number_format($run->duplicate_rows) }}</td></tr>
-                <tr><th>Started</th><td>{{ $run->started_at?->timezone(config('app.timezone'))->format('Y-m-d H:i:s') ?? 'Not started' }}</td></tr>
-                <tr><th>Completed</th><td>{{ $run->completed_at?->timezone(config('app.timezone'))->format('Y-m-d H:i:s') ?? 'In progress' }}</td></tr>
-                @if($run->failure_code)<tr><th>Failure code</th><td><code>{{ $run->failure_code }}</code></td></tr>@endif
+                <tr><th>Started</th><td>{{ $run->started_at?->timezone(config('ticketing.display_timezone', 'Asia/Dhaka'))->format('Y-m-d H:i:s') ?? 'Not started' }}</td></tr>
+                <tr><th>Completed</th><td>{{ $run->completed_at?->timezone(config('ticketing.display_timezone', 'Asia/Dhaka'))->format('Y-m-d H:i:s') ?? 'In progress' }}</td></tr>
+                @if($run->failure_code)<tr><th>Failure code</th><td><code><span title="{{ $run->failure_code }}">{{ str($run->failure_code)->limit(36) }}</span></code></td></tr>@endif
             </tbody></table>
         </div>
 
@@ -57,10 +57,10 @@
                     <form action="{{ route('dashboard.ticket-imports.control', $run->id) }}" method="POST">@csrf<input type="hidden" name="action" value="resume"><button class="btn btn-primary" type="submit">Resume import</button></form>
                 @endif
                 @if(in_array($run->processing_status->value, ['queued', 'running', 'paused'], true))
-                    <form action="{{ route('dashboard.ticket-imports.control', $run->id) }}" method="POST" onsubmit="return confirm('Cancel this import? Tickets from completed rows will remain.');">@csrf<input type="hidden" name="action" value="cancel"><button class="btn btn-ghost" type="submit">Cancel import</button></form>
+                    <form action="{{ route('dashboard.ticket-imports.control', $run->id) }}" method="POST">@csrf<input type="hidden" name="action" value="cancel"><button class="btn btn-ghost" type="submit">Cancel import</button></form>
                 @endif
                 @if(in_array($run->processing_status->value, ['completed', 'completed_with_errors', 'failed', 'cancelled'], true))
-                    <form action="{{ route('dashboard.ticket-imports.control', $run->id) }}" method="POST" onsubmit="return confirm('Archive this import history? Existing tickets and source IDs are retained.');">@csrf<input type="hidden" name="action" value="archive"><button class="btn btn-ghost" type="submit">Archive history</button></form>
+                    <form action="{{ route('dashboard.ticket-imports.control', $run->id) }}" method="POST">@csrf<input type="hidden" name="action" value="archive"><button class="btn btn-ghost" type="submit">Archive history</button></form>
                 @endif
             </div>
         @else
@@ -78,10 +78,10 @@
                 @forelse($rows as $row)
                     <tr>
                         <td>{{ $row->row_number }}</td>
-                        <td><code>{{ $row->external_id ?? '—' }}</code></td>
+                        <td><code><span title="{{ $row->external_id ?? '—' }}">{{ str($row->external_id ?? '—')->limit(36) }}</span></code></td>
                         <td>{{ str($row->result->value)->title() }}</td>
                         <td>{{ $row->ticket_id ? '#'.$row->ticket_id : '—' }}</td>
-                        <td>{{ implode(', ', $row->error_codes ?? []) ?: '—' }}</td>
+                        <td><span title="{{ implode(', ', $row->error_codes ?? []) ?: '—' }}">{{ str(implode(', ', $row->error_codes ?? []) ?: '—')->limit(100) }}</span></td>
                     </tr>
                 @empty
                     <tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted-foreground)">No CSV rows have been processed yet.</td></tr>

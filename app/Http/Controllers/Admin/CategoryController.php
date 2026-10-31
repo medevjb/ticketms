@@ -20,17 +20,21 @@ class CategoryController extends BaseController
     public function index(CategoryIndexRequest $request, CategoryService $categories): View
     {
         $items = $categories->paginate($request->user(), $request->validated());
+        $editingId = (int) $request->old('category_modal_id', $request->query('edit', 0));
+        $editingCategory = $editingId > 0 ? Category::query()->findOrFail($editingId) : null;
 
         return view('admin.categories.index', $this->getViewData([
             'dashboardRoute' => DashboardRoute::class,
             'categories' => $items->withQueryString(),
             'filters' => array_merge(['status' => 'active', 'search' => ''], $request->validated()),
+            'editingCategory' => $editingCategory,
+            'openCategoryEditor' => $request->boolean('create') || $editingCategory !== null || (bool) $request->old('category_form'),
         ]));
     }
 
-    public function create(): View
+    public function create(): RedirectResponse
     {
-        return view('admin.categories.create', $this->getViewData(['dashboardRoute' => DashboardRoute::class]));
+        return to_route('dashboard.categories.index', ['create' => 1]);
     }
 
     public function store(StoreCategoryRequest $request, CategoryService $categories): RedirectResponse
@@ -46,12 +50,9 @@ class CategoryController extends BaseController
         return to_route('dashboard.categories.index')->with('success', 'Category created successfully.');
     }
 
-    public function edit(Category $category): View
+    public function edit(Category $category): RedirectResponse
     {
-        return view('admin.categories.edit', $this->getViewData([
-            'category' => $category,
-            'dashboardRoute' => DashboardRoute::class,
-        ]));
+        return to_route('dashboard.categories.index', ['edit' => $category->id]);
     }
 
     public function update(UpdateCategoryRequest $request, Category $category, CategoryService $categories): RedirectResponse
