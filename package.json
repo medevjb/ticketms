@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node api.js && vp build",
-    "build:ssr": "vp build && vp build --ssr",
-    "dev": "node api.js && vp dev",
+    "build": "node init && vp build",
+    "build:ssr": "node init && vp build && vp build --ssr",
+    "dev": "node init && vp dev",
     "check": "vp check",
     "check:fix": "vp check --fix",
     "types:check": "tsc --noEmit"
@@ -21,8 +21,10 @@
     "clsx": "^2.1.1",
     "concurrently": "^10.0.3",
     "datatables.net-dt": "^2.3.8",
+    "dotenv": "^8.2.0",
     "laravel-echo": "^2.6.3",
     "laravel-vite-plugin": "^3.1",
+    "node-fetch": "^3.3.2",
     "pusher-js": "^8.6.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -40,7 +42,7 @@
   },
   "optionalDependencies": {
     "@laravel/multiplex": "^0.4.1",
-    "@rollup/rollup-linux-x64-gnu": "4.9.5",
+    "@rollup/rollup-linux-x64-gnu": "4.66.0",
     "@tailwindcss/oxide-linux-x64-gnu": "^4.0.1",
     "lightningcss-linux-x64-gnu": "^1.29.1"
   },
